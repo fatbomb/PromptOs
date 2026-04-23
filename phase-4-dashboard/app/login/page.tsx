@@ -70,12 +70,13 @@ export default function LoginPage() {
             </p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-6">
+          <form onSubmit={handleLogin} autoComplete="off" className="space-y-6">
             <div className="relative group">
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                autoComplete="off"
                 className="w-full bg-[var(--glass-card-bg)] border border-[var(--glass-border)] rounded-xl px-4 pt-6 pb-2 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-[var(--text-primary)] transition-all peer"
                 placeholder=" "
                 required
@@ -90,6 +91,7 @@ export default function LoginPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                autoComplete="new-password"
                 className="w-full bg-[var(--glass-card-bg)] border border-[var(--glass-border)] rounded-xl px-4 pt-6 pb-2 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 text-[var(--text-primary)] transition-all peer"
                 placeholder=" "
                 required
