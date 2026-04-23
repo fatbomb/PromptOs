@@ -1,0 +1,13 @@
+{
+  "name": "promptos-browser-extension",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/chrome": "^0.0.268"
+  }
+}

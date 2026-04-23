@@ -26,7 +26,7 @@
   function injectButton() {
     if (document.getElementById('promptos-inject-btn')) return;
 
-    const container = document.querySelector(currentSite.buttonContainer);
+    const container = document.querySelector(currentSite!.buttonContainer);
     if (!container) return;
 
     const btn = document.createElement('button');
@@ -57,7 +57,7 @@
   }
 
   function openOverlay() {
-    const inputEl = document.querySelector(currentSite.inputSelector);
+    const inputEl = document.querySelector(currentSite!.inputSelector) as HTMLElement | HTMLTextAreaElement;
     const rawPrompt = inputEl ? ('value' in inputEl ? inputEl.value : inputEl.innerText) : '';
 
     const hostDiv = document.createElement('div');
@@ -91,9 +91,9 @@
     document.body.appendChild(hostDiv);
 
     // Event listeners
-    shadow.getElementById('close-btn').onclick = () => hostDiv.remove();
+    shadow.getElementById('close-btn')!.onclick = () => hostDiv.remove();
 
-    shadow.getElementById('start-btn').onclick = () => {
+    shadow.getElementById('start-btn')!.onclick = () => {
       // TODO: Implement the actual question flow logic here (fetch to localhost:8000)
       // For now, simulate completion and inject result back
       const fakeResult = `[PromptOS Enhanced]\n${rawPrompt}\n\nContext:\n- File: app.ts\n- Error: timeout`;
