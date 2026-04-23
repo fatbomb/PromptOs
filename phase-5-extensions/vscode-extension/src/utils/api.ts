@@ -3,9 +3,6 @@
  *
  * Wraps all PromptOS API calls for the VS Code extension.
  * JWT is stored in vscode.SecretStorage (OS-keychain backed).
- *
- * Auth is optional — when the backend runs with AUTH_REQUIRED=false (default)
- * no token is needed. The Authorization header is sent only when a token exists.
  */
 
 import * as vscode from 'vscode';
@@ -16,47 +13,46 @@ export class ApiClient {
     private readonly secrets: vscode.SecretStorage,
   ) {}
 
-  private async _headers(): Promise<HeadersInit> {
+  private async _headers(): Promise<Record<string, string>> {
     const token = await this.secrets.get('promptos.jwt');
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
+    if (token) headers['Authorization'] = `Bearer ${token}`;
     return headers;
   }
 
-  async startSession(rawPrompt: string, workspaceContext?: object) {
-    const res = await fetch(`${this.baseUrl}/session/start`, {
+  private async _post(path: string, body: object): Promise<unknown> {
+    const res = await fetch(`${this.baseUrl}${path}`, {
       method: 'POST',
       headers: await this._headers(),
-      body: JSON.stringify({ raw_prompt: rawPrompt, workspace_context: workspaceContext ?? {} }),
+      body: JSON.stringify(body),
     });
+    if (!res.ok) throw new Error(`API ${path} failed: ${res.status} ${res.statusText}`);
     return res.json();
+  }
+
+  private async _get(path: string): Promise<unknown> {
+    const res = await fetch(`${this.baseUrl}${path}`, { headers: await this._headers() });
+    if (!res.ok) throw new Error(`API ${path} failed: ${res.status} ${res.statusText}`);
+    return res.json();
+  }
+
+  async startSession(rawPrompt: string, workspaceContext?: object) {
+    return this._post('/session/start', {
+      raw_prompt: rawPrompt,
+      workspace_context: workspaceContext ?? {},
+    });
   }
 
   async sendMessage(sessionId: string, userMessage: string) {
-    const res = await fetch(`${this.baseUrl}/session/message`, {
-      method: 'POST',
-      headers: await this._headers(),
-      body: JSON.stringify({ session_id: sessionId, user_message: userMessage }),
-    });
-    return res.json();
+    return this._post('/session/message', { session_id: sessionId, user_message: userMessage });
   }
 
   async completeSession(sessionId: string) {
-    const res = await fetch(`${this.baseUrl}/session/complete`, {
-      method: 'POST',
-      headers: await this._headers(),
-      body: JSON.stringify({ session_id: sessionId }),
-    });
-    return res.json();
+    return this._post('/session/complete', { session_id: sessionId });
   }
 
   async getTokenSummary() {
-    const res = await fetch(`${this.baseUrl}/tokens/summary`, {
-      headers: await this._headers(),
-    });
-    return res.json();
+    return this._get('/tokens/summary');
   }
 
   async storeToken(token: string) {
