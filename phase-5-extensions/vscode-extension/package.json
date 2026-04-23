@@ -31,8 +31,8 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./ && npx esbuild src/webview/index.tsx --bundle --outfile=out/webview.js --external:vscode",
-    "watch": "tsc -watch -p ./"
+    "compile": "tsc -p tsconfig.json && npx esbuild src/webview/index.tsx --bundle --outfile=out/webview.js --external:vscode --loader:.tsx=tsx",
+    "watch": "tsc -watch -p tsconfig.json"
   },
   "dependencies": {
     "@google/generative-ai": "^0.11.0"

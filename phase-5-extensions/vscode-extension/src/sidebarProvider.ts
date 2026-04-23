@@ -6,18 +6,20 @@
  */
 
 import * as vscode from 'vscode';
-import * as path from 'path';
 import { WorkspaceContext } from './contextExtractor';
 import { ApiClient } from './utils/api';
-
-const API_BASE = vscode.workspace.getConfiguration('promptos').get('apiUrl', 'http://localhost:8000');
 
 export class PromptosSidebarProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
   private _api: ApiClient;
+  private _apiBase: string;
 
   constructor(private readonly _context: vscode.ExtensionContext) {
-    this._api = new ApiClient(API_BASE, _context.secrets);
+    // Read config inside constructor — safe to call after activation
+    this._apiBase = vscode.workspace
+      .getConfiguration('promptos')
+      .get<string>('apiUrl', 'http://localhost:8000');
+    this._api = new ApiClient(this._apiBase, _context.secrets);
   }
 
   resolveWebviewView(webviewView: vscode.WebviewView) {
@@ -57,7 +59,8 @@ export class PromptosSidebarProvider implements vscode.WebviewViewProvider {
         }
         case 'login': {
           // Open dashboard login in browser
-          vscode.env.openExternal(vscode.Uri.parse(`${API_BASE.replace('8000', '3000')}/auth/login`));
+          const dashboardUrl = this._apiBase.replace('8000', '3000');
+          vscode.env.openExternal(vscode.Uri.parse(`${dashboardUrl}/auth/login`));
           break;
         }
       }

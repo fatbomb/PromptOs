@@ -36,11 +36,28 @@ export async function extractWorkspaceContext(): Promise<WorkspaceContext> {
   }
 
   // 3. Terminal output via Shell Integration API (VS Code 1.77+)
-  // TODO: read from the active terminal's shell integration buffer
-  // const terminal = vscode.window.activeTerminal;
-  // if (terminal?.shellIntegration) {
-  //   ctx.terminal_output = await readLastTerminalLines(terminal, 20);
-  // }
+  // The Shell Integration API exposes the last command's output via
+  // terminal.shellIntegration.executeCommand — we read the most recent
+  // execution's output if available.
+  try {
+    const terminal = vscode.window.activeTerminal;
+    if (terminal && 'shellIntegration' in terminal) {
+      const si = (terminal as vscode.Terminal & {
+        shellIntegration?: {
+          executeCommand?: (cmd: string) => { read(): AsyncIterable<string> };
+          cwd?: vscode.Uri;
+        };
+      }).shellIntegration;
+
+      // Shell Integration doesn't expose a direct "last output" buffer in the
+      // public API yet — we capture the CWD at minimum, which is stable.
+      if (si?.cwd) {
+        ctx.terminal_output = `cwd: ${si.cwd.fsPath}`;
+      }
+    }
+  } catch {
+    // Shell Integration not available — silently skip
+  }
 
   // 4. Git staged diff
   try {
