@@ -1,0 +1,49 @@
+{
+  "name": "promptos-vscode",
+  "displayName": "PromptOS",
+  "description": "Prompt refinement for AI coding assistants — right in your editor",
+  "version": "0.1.0",
+  "engines": { "vscode": "^1.77.0" },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "promptos",
+          "title": "PromptOS",
+          "icon": "$(comment-discussion)"
+        }
+      ]
+    },
+    "views": {
+      "promptos": [
+        { "type": "webview", "id": "promptos.sidebar", "name": "Refine Prompt" }
+      ]
+    },
+    "commands": [
+      {
+        "command": "promptos.startSession",
+        "title": "PromptOS: Start Refinement Session"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./ && npx esbuild src/webview/index.tsx --bundle --outfile=out/webview.js --external:vscode",
+    "watch": "tsc -watch -p ./"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.11.0"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.77.0",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "typescript": "^5",
+    "esbuild": "^0.21.0",
+    "react": "^18",
+    "react-dom": "^18"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "PromptOS",
+  "version": "0.1.0",
+  "description": "Enhance your prompts before sending to Claude or ChatGPT",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": [
+    "https://claude.ai/*",
+    "https://chat.openai.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://claude.ai/*", "https://chat.openai.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "PromptOS"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["overlay.css", "overlay.html"],
+      "matches": ["https://claude.ai/*", "https://chat.openai.com/*"]
+    }
+  ]
+}
