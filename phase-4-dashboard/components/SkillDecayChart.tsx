@@ -1,55 +1,78 @@
 'use client';
 
-/**
- * SkillDecayChart Component — Phase 4, Task 4.4
- *
- * 3-line Recharts LineChart:
- *   - Dependency Score   (orange — going down = good)
- *   - Thinking Depth     (blue   — going up = good)
- *   - Self-Solve Rate %  (green  — going up = good)
- *
- * X axis = week_start labels
- */
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer,
-} from 'recharts';
-
-interface WeekRow {
+interface SkillDecayData {
   week_start: string;
   avg_dependency_score: number;
   avg_thinking_depth: number;
-  self_solve_rate: number;
 }
 
 interface Props {
-  data: WeekRow[];
+  data: SkillDecayData[];
 }
 
 export default function SkillDecayChart({ data }: Props) {
-  const chartData = data.map((row) => ({
+  const chartData = [...data].reverse().map(row => ({
     week: new Date(row.week_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-    dependency: Math.round(row.avg_dependency_score),
-    thinking:   Math.round(row.avg_thinking_depth),
-    selfSolve:  Math.round(row.self_solve_rate * 100),
+    dependency: row.avg_dependency_score,
+    depth: row.avg_thinking_depth,
   }));
 
   return (
-    <ResponsiveContainer width="100%" height={320}>
-      <LineChart data={chartData} margin={{ top: 8, right: 24, left: 0, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-        <XAxis dataKey="week" stroke="#9ca3af" tick={{ fontSize: 12 }} />
-        <YAxis stroke="#9ca3af" tick={{ fontSize: 12 }} domain={[0, 100]} />
-        <Tooltip
-          contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: 8 }}
-          labelStyle={{ color: '#e5e7eb' }}
-        />
-        <Legend />
-        <Line type="monotone" dataKey="dependency" name="Dependency ↓" stroke="#f97316" strokeWidth={2} dot={{ r: 4 }} />
-        <Line type="monotone" dataKey="thinking"   name="Thinking ↑"   stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} />
-        <Line type="monotone" dataKey="selfSolve"  name="Self-Solve % ↑" stroke="#22c55e" strokeWidth={2} dot={{ r: 4 }} />
-      </LineChart>
-    </ResponsiveContainer>
+    <div className="glass-card border-gray-800 p-6 md:p-8 rounded-2xl relative overflow-hidden group">
+      <div className="absolute top-0 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-amber-500/30 to-transparent"></div>
+
+      <ResponsiveContainer width="100%" height={360}>
+        <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-gray-200 dark:text-gray-800" vertical={false} />
+          <XAxis 
+             dataKey="week" 
+             stroke="currentColor" 
+             className="text-gray-400 dark:text-gray-500"
+             tick={{ fill: 'currentColor', fontSize: 13 }} 
+             tickLine={false} 
+             axisLine={false} 
+             dy={10} 
+          />
+          <YAxis 
+             stroke="currentColor" 
+             className="text-gray-400 dark:text-gray-500"
+             tick={{ fill: 'currentColor', fontSize: 13 }} 
+             tickLine={false} 
+             axisLine={false} 
+             domain={[0, 100]}
+          />
+          <Tooltip
+            contentStyle={{ 
+              backgroundColor: 'var(--glass-card-bg)', 
+              backdropFilter: 'blur(12px)',
+              border: '1px solid var(--glass-card-border)', 
+              borderRadius: '12px',
+              color: 'var(--text-primary)',
+            }}
+            itemStyle={{ color: 'var(--text-primary)', fontWeight: 500 }}
+          />
+          <Line 
+            type="monotone" 
+            dataKey="dependency" 
+            name="Dependency Score (Lower is better)" 
+            stroke="#fbbf24" 
+            strokeWidth={4}
+            dot={{ r: 4, fill: '#fbbf24', strokeWidth: 0 }}
+            activeDot={{ r: 6, fill: '#fff', stroke: '#fbbf24', strokeWidth: 2 }}
+          />
+          <Line 
+            type="monotone" 
+            dataKey="depth" 
+            name="Thinking Depth (Higher is better)" 
+            stroke="#3b82f6" 
+            strokeWidth={4}
+            dot={{ r: 4, fill: '#3b82f6', strokeWidth: 0 }}
+            activeDot={{ r: 6, fill: '#fff', stroke: '#3b82f6', strokeWidth: 2 }}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
   );
 }

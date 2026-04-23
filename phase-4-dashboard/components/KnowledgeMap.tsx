@@ -1,78 +1,107 @@
 'use client';
 
-/**
- * KnowledgeMap Component — Phase 4, Task 4.3
- *
- * Renders a scatter/bubble chart of concept tags.
- * - Size     = encounter_count
- * - Color    = color_band (green / amber / red)
- * - Click    = opens QuizModal for that concept
- *
- * TODO: Replace ScatterChart with D3 force layout for organic bubble feel.
- */
+import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ZAxis } from 'recharts';
 
-import { useState } from 'react';
-import { ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import QuizModal from './QuizModal';
-
-const BAND_COLORS = { green: '#22c55e', amber: '#f59e0b', red: '#ef4444' };
-
-interface Concept {
+interface ConceptData {
   concept: string;
   encounter_count: number;
   avg_score: number;
-  color_band: 'green' | 'amber' | 'red';
-  quiz_score?: number;
+  color_band: string;
 }
 
 interface Props {
-  concepts: Concept[];
+  data: ConceptData[];
+  onConceptClick: (concept: string) => void;
 }
 
-export default function KnowledgeMap({ concepts }: Props) {
-  const [selected, setSelected] = useState<Concept | null>(null);
-
-  const chartData = concepts.map((c, i) => ({
-    x: (i % 6) * 120 + 60,            // simple grid layout — swap for D3 force
-    y: Math.round(c.avg_score),
-    z: c.encounter_count * 10,
-    ...c,
+export default function KnowledgeMap({ data, onConceptClick }: Props) {
+  // We'll map data to a scattered grid roughly by index or encounter_count to create a nice distribution
+  const chartData = data.map((d, i) => ({
+    ...d,
+    x: (i % 5) * 20 + Math.random() * 10, // Spread loosely across X
+    y: d.avg_score, // Y axis is the actual score
+    z: d.encounter_count * 100, // Z axis is bubble size (encounter count)
   }));
 
+  const getColor = (band: string) => {
+    switch (band) {
+      case 'green': return 'rgba(52, 211, 153, 0.8)';
+      case 'amber': return 'rgba(251, 191, 36, 0.8)';
+      case 'red': return 'rgba(248, 113, 113, 0.8)';
+      default: return 'rgba(156, 163, 175, 0.8)';
+    }
+  };
+
+  const getStroke = (band: string) => {
+    switch (band) {
+      case 'green': return '#059669';
+      case 'amber': return '#d97706';
+      case 'red': return '#dc2626';
+      default: return '#4b5563';
+    }
+  };
+
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const p = payload[0].payload;
+      return (
+        <div className="bg-gray-900/90 backdrop-blur-md border border-white/10 p-4 rounded-xl shadow-2xl">
+          <p className="text-lg font-bold text-white mb-1">{p.concept}</p>
+          <p className="text-sm text-gray-400">Score: <span className="text-white font-semibold">{p.avg_score.toFixed(1)}</span></p>
+          <p className="text-sm text-gray-400">Encounters: <span className="text-white font-semibold">{p.encounter_count}</span></p>
+          {(p.color_band === 'amber' || p.color_band === 'red') && (
+            <p className="text-xs text-blue-400 mt-2 font-semibold">Click to start remediation quiz →</p>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
-    <>
-      <ResponsiveContainer width="100%" height={400}>
-        <ScatterChart>
-          <XAxis dataKey="x" hide />
-          <YAxis dataKey="y" hide />
-          <Tooltip
-            content={({ payload }) => {
-              if (!payload?.length) return null;
-              const d = payload[0].payload;
-              return (
-                <div className="bg-gray-800 border border-gray-700 rounded p-3 text-sm">
-                  <p className="font-bold">{d.concept}</p>
-                  <p className="text-gray-400">Seen {d.encounter_count}×</p>
-                  <p className="text-gray-400">Avg score: {d.avg_score.toFixed(0)}</p>
-                </div>
-              );
-            }}
+    <div className="glass-card border-gray-800 p-6 rounded-2xl relative overflow-hidden group">
+      <div className="absolute top-0 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-purple-500/30 to-transparent"></div>
+      
+      <ResponsiveContainer width="100%" height={500}>
+        <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-gray-200 dark:text-gray-800" vertical={false} />
+          {/* Hide X axis visually but use it for scattering */}
+          <XAxis type="number" dataKey="x" hide domain={[0, 100]} />
+          <YAxis 
+            type="number" 
+            dataKey="y" 
+            name="Score" 
+            domain={[0, 100]} 
+            stroke="currentColor" 
+            className="text-gray-400 dark:text-gray-500"
+            tick={{ fill: 'currentColor', fontSize: 13 }}
+            tickLine={false} 
+            axisLine={false}
           />
-          <Scatter
-            data={chartData}
-            onClick={(data) => setSelected(data as unknown as Concept)}
-            cursor="pointer"
+          <ZAxis type="number" dataKey="z" range={[100, 2000]} name="Encounters" />
+          <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<CustomTooltip />} />
+          <Scatter 
+            name="Concepts" 
+            data={chartData} 
+            onClick={(data) => {
+              if (data?.color_band === 'amber' || data?.color_band === 'red') {
+                onConceptClick(data.concept);
+              }
+            }}
+            className="cursor-pointer"
           >
-            {chartData.map((entry, i) => (
-              <Cell key={i} fill={BAND_COLORS[entry.color_band] ?? '#6b7280'} fillOpacity={0.85} />
+            {chartData.map((entry, index) => (
+              <Cell 
+                key={`cell-${index}`} 
+                fill={getColor(entry.color_band)} 
+                stroke={getStroke(entry.color_band)}
+                strokeWidth={2}
+                className="transition-all hover:opacity-100 opacity-80"
+              />
             ))}
           </Scatter>
         </ScatterChart>
       </ResponsiveContainer>
-
-      {selected && (
-        <QuizModal concept={selected.concept} onClose={() => setSelected(null)} />
-      )}
-    </>
+    </div>
   );
 }
