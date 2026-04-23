@@ -1,3 +1,4 @@
+"use strict";
 /**
  * Browser Extension Content Script — Phase 5, Task 5.4
  *
@@ -8,80 +9,61 @@
  * Real question flow:
  *   POST /session/start → loop POST /session/message → inject assembled prompt
  */
-
 const API_BASE = 'http://localhost:8000';
-
 // JWT stored in chrome.storage.local — optional when backend runs in dev mode (AUTH_REQUIRED=false)
-async function getToken(): Promise<string | null> {
-  return new Promise((resolve) => {
-    chrome.storage.local.get('promptos_jwt', (result) => {
-      resolve(result.promptos_jwt ?? null);
+async function getToken() {
+    return new Promise((resolve) => {
+        chrome.storage.local.get('promptos_jwt', (result) => {
+            resolve(result.promptos_jwt ?? null);
+        });
     });
-  });
 }
-
-async function apiFetch(path: string, body: object): Promise<Record<string, unknown>> {
-  const token = await getToken();
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    throw new Error(`API error ${res.status}: ${await res.text()}`);
-  }
-  return res.json();
+async function apiFetch(path, body) {
+    const token = await getToken();
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    const res = await fetch(`${API_BASE}${path}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+        throw new Error(`API error ${res.status}: ${await res.text()}`);
+    }
+    return res.json();
 }
-
-// ---------------------------------------------------------------------------
-// Site config
-// ---------------------------------------------------------------------------
-
-interface SiteConfig {
-  host: string;
-  inputSelector: string;
-  buttonContainer: string;
-}
-
-const SITES: Record<string, SiteConfig> = {
-  claude: {
-    host: 'claude.ai',
-    inputSelector: 'div[contenteditable="true"]',
-    buttonContainer: 'fieldset',
-  },
-  chatgpt: {
-    host: 'chat.openai.com',
-    inputSelector: 'textarea#prompt-textarea',
-    buttonContainer: 'form',
-  },
+const SITES = {
+    claude: {
+        host: 'claude.ai',
+        inputSelector: 'div[contenteditable="true"]',
+        buttonContainer: 'fieldset',
+    },
+    chatgpt: {
+        host: 'chat.openai.com',
+        inputSelector: 'textarea#prompt-textarea',
+        buttonContainer: 'form',
+    },
 };
-
-const currentSite = Object.values(SITES).find((s) =>
-  window.location.hostname.includes(s.host)
-);
+const currentSite = Object.values(SITES).find((s) => window.location.hostname.includes(s.host));
 if (!currentSite) {
-  // Not on a supported site — do nothing
-  throw new Error('PromptOS: unsupported site');
+    // Not on a supported site — do nothing
+    throw new Error('PromptOS: unsupported site');
 }
-
 // ---------------------------------------------------------------------------
 // Button injection
 // ---------------------------------------------------------------------------
-
-function injectButton(): void {
-  if (document.getElementById('promptos-inject-btn')) return;
-
-  const container = document.querySelector(currentSite!.buttonContainer);
-  if (!container) return;
-
-  const btn = document.createElement('button');
-  btn.id = 'promptos-inject-btn';
-  btn.innerText = '⚡ Enhance with PromptOS';
-  btn.style.cssText = `
+function injectButton() {
+    if (document.getElementById('promptos-inject-btn'))
+        return;
+    const container = document.querySelector(currentSite.buttonContainer);
+    if (!container)
+        return;
+    const btn = document.createElement('button');
+    btn.id = 'promptos-inject-btn';
+    btn.innerText = '⚡ Enhance with PromptOS';
+    btn.style.cssText = `
     background: #2563eb;
     color: white;
     border: none;
@@ -96,194 +78,156 @@ function injectButton(): void {
     gap: 6px;
     z-index: 9999;
   `;
-
-  btn.onclick = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    openOverlay();
-  };
-
-  container.appendChild(btn);
+    btn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openOverlay();
+    };
+    container.appendChild(btn);
 }
-
 // ---------------------------------------------------------------------------
 // Overlay — Shadow DOM isolated question flow
 // ---------------------------------------------------------------------------
-
-function openOverlay(): void {
-  // Prevent duplicate overlays
-  if (document.getElementById('promptos-overlay-host')) return;
-
-  const inputEl = document.querySelector(
-    currentSite!.inputSelector
-  ) as HTMLElement | HTMLTextAreaElement | null;
-
-  const rawPrompt = inputEl
-    ? 'value' in inputEl
-      ? (inputEl as HTMLTextAreaElement).value
-      : inputEl.innerText
-    : '';
-
-  // Host element + Shadow DOM
-  const hostDiv = document.createElement('div');
-  hostDiv.id = 'promptos-overlay-host';
-  hostDiv.style.cssText =
-    'position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.65);';
-
-  const shadow = hostDiv.attachShadow({ mode: 'open' });
-
-  // Inject styles
-  const style = document.createElement('style');
-  style.textContent = overlayCSS();
-  shadow.appendChild(style);
-
-  // Initial UI — show raw prompt, Start Flow button
-  shadow.appendChild(buildInitialUI(rawPrompt));
-  document.body.appendChild(hostDiv);
-
-  // Close on backdrop click
-  hostDiv.addEventListener('click', (e) => {
-    if (e.target === hostDiv) hostDiv.remove();
-  });
-
-  // Wire up Start Flow
-  shadow.getElementById('promptos-start-btn')!.addEventListener('click', () => {
-    runQuestionFlow(shadow, hostDiv, inputEl, rawPrompt);
-  });
-
-  shadow.getElementById('promptos-close-btn')!.addEventListener('click', () => {
-    hostDiv.remove();
-  });
+function openOverlay() {
+    // Prevent duplicate overlays
+    if (document.getElementById('promptos-overlay-host'))
+        return;
+    const inputEl = document.querySelector(currentSite.inputSelector);
+    const rawPrompt = inputEl
+        ? 'value' in inputEl
+            ? inputEl.value
+            : inputEl.innerText
+        : '';
+    // Host element + Shadow DOM
+    const hostDiv = document.createElement('div');
+    hostDiv.id = 'promptos-overlay-host';
+    hostDiv.style.cssText =
+        'position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.65);';
+    const shadow = hostDiv.attachShadow({ mode: 'open' });
+    // Inject styles
+    const style = document.createElement('style');
+    style.textContent = overlayCSS();
+    shadow.appendChild(style);
+    // Initial UI — show raw prompt, Start Flow button
+    shadow.appendChild(buildInitialUI(rawPrompt));
+    document.body.appendChild(hostDiv);
+    // Close on backdrop click
+    hostDiv.addEventListener('click', (e) => {
+        if (e.target === hostDiv)
+            hostDiv.remove();
+    });
+    // Wire up Start Flow
+    shadow.getElementById('promptos-start-btn').addEventListener('click', () => {
+        runQuestionFlow(shadow, hostDiv, inputEl, rawPrompt);
+    });
+    shadow.getElementById('promptos-close-btn').addEventListener('click', () => {
+        hostDiv.remove();
+    });
 }
-
 // ---------------------------------------------------------------------------
 // Question flow state machine
 // ---------------------------------------------------------------------------
-
-async function runQuestionFlow(
-  shadow: ShadowRoot,
-  hostDiv: HTMLElement,
-  inputEl: HTMLElement | HTMLTextAreaElement | null,
-  rawPrompt: string
-): Promise<void> {
-  // Show loading state
-  setContent(shadow, loadingHTML('Starting session...'));
-
-  let sessionId: string;
-  try {
-    const startRes = await apiFetch('/session/start', { raw_prompt: rawPrompt });
-    sessionId = startRes.session_id as string;
-  } catch (err) {
-    setContent(shadow, errorHTML(`Failed to start session: ${err}`));
-    return;
-  }
-
-  // Kick off first turn
-  await askNextQuestion(shadow, hostDiv, inputEl, sessionId, '_init_', 1);
-}
-
-async function askNextQuestion(
-  shadow: ShadowRoot,
-  hostDiv: HTMLElement,
-  inputEl: HTMLElement | HTMLTextAreaElement | null,
-  sessionId: string,
-  userMessage: string,
-  turnNum: number
-): Promise<void> {
-  setContent(shadow, loadingHTML('Thinking...'));
-
-  let msgRes: Record<string, unknown>;
-  try {
-    msgRes = await apiFetch('/session/message', {
-      session_id: sessionId,
-      user_message: userMessage,
-    });
-  } catch (err) {
-    setContent(shadow, errorHTML(`API error: ${err}`));
-    return;
-  }
-
-  if (msgRes.done) {
-    if (msgRes.should_refuse) {
-      // Refusal Engine fired
-      setContent(shadow, refusalHTML(msgRes.message as string));
-      shadow.getElementById('promptos-restart-btn')?.addEventListener('click', () => hostDiv.remove());
-    } else {
-      // Session complete — inject assembled prompt
-      const assembled = msgRes.assembled_prompt as string;
-      const scores = msgRes.scores as Record<string, number> | undefined;
-      setContent(shadow, completeHTML(assembled, scores));
-
-      shadow.getElementById('promptos-inject-btn-confirm')?.addEventListener('click', () => {
-        injectPrompt(inputEl, assembled);
-        hostDiv.remove();
-      });
-      shadow.getElementById('promptos-cancel-btn')?.addEventListener('click', () => hostDiv.remove());
+async function runQuestionFlow(shadow, hostDiv, inputEl, rawPrompt) {
+    // Show loading state
+    setContent(shadow, loadingHTML('Starting session...'));
+    let sessionId;
+    try {
+        const startRes = await apiFetch('/session/start', { raw_prompt: rawPrompt });
+        sessionId = startRes.session_id;
     }
-    return;
-  }
-
-  // Show next question
-  const question = msgRes.question as string;
-  setContent(shadow, questionHTML(question, turnNum));
-
-  const submitAnswer = async () => {
-    const input = shadow.getElementById('promptos-answer-input') as HTMLInputElement | null;
-    const answer = input?.value.trim();
-    if (!answer) return;
-    await askNextQuestion(shadow, hostDiv, inputEl, sessionId, answer, turnNum + 1);
-  };
-
-  shadow.getElementById('promptos-submit-btn')?.addEventListener('click', submitAnswer);
-  const answerInput = shadow.getElementById('promptos-answer-input') as HTMLInputElement | null;
-  answerInput?.addEventListener('keydown', (e) => {
-    if ((e as KeyboardEvent).key === 'Enter') submitAnswer();
-  });
-  setTimeout(() => answerInput?.focus(), 50);
+    catch (err) {
+        setContent(shadow, errorHTML(`Failed to start session: ${err}`));
+        return;
+    }
+    // Kick off first turn
+    await askNextQuestion(shadow, hostDiv, inputEl, sessionId, '_init_', 1);
 }
-
+async function askNextQuestion(shadow, hostDiv, inputEl, sessionId, userMessage, turnNum) {
+    setContent(shadow, loadingHTML('Thinking...'));
+    let msgRes;
+    try {
+        msgRes = await apiFetch('/session/message', {
+            session_id: sessionId,
+            user_message: userMessage,
+        });
+    }
+    catch (err) {
+        setContent(shadow, errorHTML(`API error: ${err}`));
+        return;
+    }
+    if (msgRes.done) {
+        if (msgRes.should_refuse) {
+            // Refusal Engine fired
+            setContent(shadow, refusalHTML(msgRes.message));
+            shadow.getElementById('promptos-restart-btn')?.addEventListener('click', () => hostDiv.remove());
+        }
+        else {
+            // Session complete — inject assembled prompt
+            const assembled = msgRes.assembled_prompt;
+            const scores = msgRes.scores;
+            setContent(shadow, completeHTML(assembled, scores));
+            shadow.getElementById('promptos-inject-btn-confirm')?.addEventListener('click', () => {
+                injectPrompt(inputEl, assembled);
+                hostDiv.remove();
+            });
+            shadow.getElementById('promptos-cancel-btn')?.addEventListener('click', () => hostDiv.remove());
+        }
+        return;
+    }
+    // Show next question
+    const question = msgRes.question;
+    setContent(shadow, questionHTML(question, turnNum));
+    const submitAnswer = async () => {
+        const input = shadow.getElementById('promptos-answer-input');
+        const answer = input?.value.trim();
+        if (!answer)
+            return;
+        await askNextQuestion(shadow, hostDiv, inputEl, sessionId, answer, turnNum + 1);
+    };
+    shadow.getElementById('promptos-submit-btn')?.addEventListener('click', submitAnswer);
+    const answerInput = shadow.getElementById('promptos-answer-input');
+    answerInput?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter')
+            submitAnswer();
+    });
+    setTimeout(() => answerInput?.focus(), 50);
+}
 // ---------------------------------------------------------------------------
 // Inject assembled prompt back into the page input
 // ---------------------------------------------------------------------------
-
-function injectPrompt(
-  inputEl: HTMLElement | HTMLTextAreaElement | null,
-  text: string
-): void {
-  if (!inputEl) return;
-  if ('value' in inputEl) {
-    (inputEl as HTMLTextAreaElement).value = text;
-  } else {
-    inputEl.innerText = text;
-  }
-  // Trigger React/framework synthetic event so the page picks up the change
-  inputEl.dispatchEvent(new Event('input', { bubbles: true }));
-  inputEl.dispatchEvent(new Event('change', { bubbles: true }));
-  inputEl.focus();
+function injectPrompt(inputEl, text) {
+    if (!inputEl)
+        return;
+    if ('value' in inputEl) {
+        inputEl.value = text;
+    }
+    else {
+        inputEl.innerText = text;
+    }
+    // Trigger React/framework synthetic event so the page picks up the change
+    inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+    inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+    inputEl.focus();
 }
-
 // ---------------------------------------------------------------------------
 // Shadow DOM helpers — set inner content
 // ---------------------------------------------------------------------------
-
-function setContent(shadow: ShadowRoot, html: string): void {
-  let wrapper = shadow.getElementById('promptos-wrapper');
-  if (!wrapper) {
-    wrapper = document.createElement('div');
-    wrapper.id = 'promptos-wrapper';
-    shadow.appendChild(wrapper);
-  }
-  wrapper.innerHTML = html;
+function setContent(shadow, html) {
+    let wrapper = shadow.getElementById('promptos-wrapper');
+    if (!wrapper) {
+        wrapper = document.createElement('div');
+        wrapper.id = 'promptos-wrapper';
+        shadow.appendChild(wrapper);
+    }
+    wrapper.innerHTML = html;
 }
-
 // ---------------------------------------------------------------------------
 // HTML templates
 // ---------------------------------------------------------------------------
-
-function buildInitialUI(rawPrompt: string): HTMLElement {
-  const wrapper = document.createElement('div');
-  wrapper.id = 'promptos-wrapper';
-  wrapper.innerHTML = `
+function buildInitialUI(rawPrompt) {
+    const wrapper = document.createElement('div');
+    wrapper.id = 'promptos-wrapper';
+    wrapper.innerHTML = `
     <div class="modal">
       <div class="modal-header">
         <span class="modal-title">⚡ PromptOS Refinement</span>
@@ -296,11 +240,10 @@ function buildInitialUI(rawPrompt: string): HTMLElement {
       </div>
     </div>
   `;
-  return wrapper;
+    return wrapper;
 }
-
-function loadingHTML(msg: string): string {
-  return `
+function loadingHTML(msg) {
+    return `
     <div class="modal">
       <div class="modal-body center">
         <div class="spinner"></div>
@@ -309,9 +252,8 @@ function loadingHTML(msg: string): string {
     </div>
   `;
 }
-
-function questionHTML(question: string, turn: number): string {
-  return `
+function questionHTML(question, turn) {
+    return `
     <div class="modal">
       <div class="modal-header">
         <span class="modal-title">⚡ PromptOS — Question ${turn} of ~4</span>
@@ -324,9 +266,8 @@ function questionHTML(question: string, turn: number): string {
     </div>
   `;
 }
-
-function refusalHTML(message: string): string {
-  return `
+function refusalHTML(message) {
+    return `
     <div class="modal">
       <div class="modal-body center">
         <p class="refuse-msg">🚫 ${escapeHtml(message ?? 'You already know the answer. Try implementing it.')}</p>
@@ -335,16 +276,15 @@ function refusalHTML(message: string): string {
     </div>
   `;
 }
-
-function completeHTML(assembled: string, scores?: Record<string, number>): string {
-  const scoreBar = scores
-    ? `<div class="scores">
+function completeHTML(assembled, scores) {
+    const scoreBar = scores
+        ? `<div class="scores">
         <span>Depth: ${scores.thinking_depth_score}/100</span>
         <span>Dep: ${scores.dependency_score}/100</span>
         <span>Turns saved: ${scores.estimated_turns_saved}</span>
        </div>`
-    : '';
-  return `
+        : '';
+    return `
     <div class="modal">
       <div class="modal-header">
         <span class="modal-title">✅ Assembled Prompt</span>
@@ -358,9 +298,8 @@ function completeHTML(assembled: string, scores?: Record<string, number>): strin
     </div>
   `;
 }
-
-function errorHTML(msg: string): string {
-  return `
+function errorHTML(msg) {
+    return `
     <div class="modal">
       <div class="modal-body center">
         <p class="error-msg">⚠️ ${escapeHtml(msg)}</p>
@@ -369,21 +308,18 @@ function errorHTML(msg: string): string {
     </div>
   `;
 }
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+function escapeHtml(str) {
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
 }
-
 // ---------------------------------------------------------------------------
 // Overlay CSS (injected into Shadow DOM)
 // ---------------------------------------------------------------------------
-
-function overlayCSS(): string {
-  return `
+function overlayCSS() {
+    return `
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     .modal {
@@ -539,13 +475,10 @@ function overlayCSS(): string {
     @keyframes spin { to { transform: rotate(360deg); } }
   `;
 }
-
 // ---------------------------------------------------------------------------
 // DOM observer — re-inject button on SPA navigation
 // ---------------------------------------------------------------------------
-
 const observer = new MutationObserver(() => injectButton());
 observer.observe(document.body, { childList: true, subtree: true });
-
 // Initial attempt after page settles
 setTimeout(injectButton, 2000);

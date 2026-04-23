@@ -1,0 +1,9 @@
+/*
+ * overlay.css — Phase 5, Task 5.4
+ *
+ * Fallback stylesheet for the Shadow DOM overlay.
+ * The primary styles are injected inline via overlayCSS() in content.ts.
+ * This file satisfies the manifest web_accessible_resources reference.
+ */
+
+/* intentionally minimal — styles live in content.ts overlayCSS() */
