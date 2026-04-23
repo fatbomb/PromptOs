@@ -11,7 +11,7 @@
 
 const API_BASE = 'http://localhost:8000';
 
-// JWT stored in chrome.storage.local after login
+// JWT stored in chrome.storage.local — optional when backend runs in dev mode (AUTH_REQUIRED=false)
 async function getToken(): Promise<string | null> {
   return new Promise((resolve) => {
     chrome.storage.local.get('promptos_jwt', (result) => {
@@ -22,12 +22,13 @@ async function getToken(): Promise<string | null> {
 
 async function apiFetch(path: string, body: object): Promise<Record<string, unknown>> {
   const token = await getToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
+    headers,
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -363,7 +364,7 @@ function errorHTML(msg: string): string {
     <div class="modal">
       <div class="modal-body center">
         <p class="error-msg">⚠️ ${escapeHtml(msg)}</p>
-        <p class="hint">Make sure the PromptOS backend is running on localhost:8000 and you are logged in.</p>
+        <p class="hint">Make sure the PromptOS backend is running on localhost:8000.</p>
       </div>
     </div>
   `;

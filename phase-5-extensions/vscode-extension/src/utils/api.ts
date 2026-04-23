@@ -3,6 +3,9 @@
  *
  * Wraps all PromptOS API calls for the VS Code extension.
  * JWT is stored in vscode.SecretStorage (OS-keychain backed).
+ *
+ * Auth is optional — when the backend runs with AUTH_REQUIRED=false (default)
+ * no token is needed. The Authorization header is sent only when a token exists.
  */
 
 import * as vscode from 'vscode';
@@ -15,10 +18,11 @@ export class ApiClient {
 
   private async _headers(): Promise<HeadersInit> {
     const token = await this.secrets.get('promptos.jwt');
-    return {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
   }
 
   async startSession(rawPrompt: string, workspaceContext?: object) {
