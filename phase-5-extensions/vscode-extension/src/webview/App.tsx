@@ -1,10 +1,16 @@
 /**
  * VS Code Webview React App — Phase 5, Task 5.3
  *
- * State machine: idle → asking → complete → sent | refused
+ * Renders the full question flow UI inside the PromptOS sidebar webview.
+ *
+ * State machine:
+ *   idle → asking (Q loop) → complete → sent
+ *
+ * Communicates with the extension host via window.vscode.postMessage.
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { createRoot } from 'react-dom/client';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const vscode = (window as any).acquireVsCodeApi?.();
@@ -18,54 +24,29 @@ interface Scores {
   estimated_turns_saved: number;
 }
 
-const s: Record<string, React.CSSProperties> = {
-  wrap:    { padding: 16, fontFamily: 'var(--vscode-font-family)', color: 'var(--vscode-editor-foreground)' },
-  input:   { width: '100%', boxSizing: 'border-box', background: 'var(--vscode-input-background)', color: 'var(--vscode-input-foreground)', border: '1px solid var(--vscode-input-border)', borderRadius: 6, padding: 8 },
-  btn:     { marginTop: 8, width: '100%', padding: '8px 0', background: 'var(--vscode-button-background)', color: 'var(--vscode-button-foreground)', border: 'none', borderRadius: 6, cursor: 'pointer' },
-  linkBtn: { marginTop: 6, width: '100%', padding: '6px 0', background: 'transparent', color: 'var(--vscode-textLink-foreground)', border: 'none', cursor: 'pointer' },
-  pre:     { fontSize: 11, background: 'var(--vscode-textCodeBlock-background)', padding: 10, borderRadius: 6, whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 200, overflow: 'auto' },
-  error:   { background: '#f59e0b22', border: '1px solid #f59e0b', borderRadius: 8, padding: 12 },
-  apiErr:  { background: '#ef444422', border: '1px solid #ef4444', borderRadius: 8, padding: 10, fontSize: 12, marginTop: 8 },
-};
-
 export default function App() {
-  const [phase, setPhase]         = useState<Phase>('idle');
-  const [rawPrompt, setRawPrompt] = useState('');
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [question, setQuestion]   = useState('');
-  const [turnNum, setTurnNum]     = useState(1);
-  const [answer, setAnswer]       = useState('');
-  const [assembled, setAssembled] = useState('');
-  const [scores, setScores]       = useState<Scores | null>(null);
-  const [refuseMsg, setRefuseMsg] = useState('');
-  const [apiError, setApiError]   = useState<string | null>(null);
+  const [phase, setPhase]               = useState<Phase>('idle');
+  const [rawPrompt, setRawPrompt]       = useState('');
+  const [sessionId, setSessionId]       = useState<string | null>(null);
+  const [question, setQuestion]         = useState('');
+  const [turnNum, setTurnNum]           = useState(1);
+  const [answer, setAnswer]             = useState('');
+  const [assembled, setAssembled]       = useState('');
+  const [scores, setScores]             = useState<Scores | null>(null);
+  const [refuseMsg, setRefuseMsg]       = useState('');
 
-  const inputRef    = useRef<HTMLInputElement>(null);
-  const sessionRef  = useRef<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Keep ref in sync so message handler always has latest sessionId
-  useEffect(() => { sessionRef.current = sessionId; }, [sessionId]);
-
-  const reset = useCallback(() => {
-    setPhase('idle');
-    setRawPrompt('');
-    setAssembled('');
-    setScores(null);
-    setApiError(null);
-    setTurnNum(1);
-  }, []);
-
+  // Listen for messages from extension host
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       const msg = event.data;
-      setApiError(null);
-
       switch (msg.type) {
         case 'sessionStarted':
           setSessionId(msg.sessionId);
+          // Immediately request first question
           vscode?.postMessage({ type: 'sendMessage', sessionId: msg.sessionId, userMessage: '_init_' });
           break;
-
         case 'messageResponse':
           if (msg.done) {
             if (msg.should_refuse) {
@@ -75,35 +56,29 @@ export default function App() {
               setAssembled(msg.assembled_prompt);
               setScores(msg.scores);
               setPhase('complete');
-              vscode?.postMessage({ type: 'completeSession', sessionId: sessionRef.current });
+              vscode?.postMessage({ type: 'completeSession', sessionId });
             }
           } else {
             setQuestion(msg.question);
-            setTurnNum(msg.turn ?? (t => t + 1));
+            setTurnNum(msg.turn ?? turnNum + 1);
             setPhase('asking');
             setTimeout(() => inputRef.current?.focus(), 100);
           }
           break;
-
-        case 'error':
-          setApiError(msg.message ?? 'Something went wrong.');
-          break;
       }
     };
-
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, []); // no deps — uses refs for mutable values
+  }, [sessionId, turnNum]);
 
   const handleStart = () => {
     if (!rawPrompt.trim()) return;
-    setApiError(null);
     vscode?.postMessage({ type: 'startSession', rawPrompt: rawPrompt.trim() });
   };
 
   const handleAnswer = () => {
-    if (!answer.trim() || !sessionRef.current) return;
-    vscode?.postMessage({ type: 'sendMessage', sessionId: sessionRef.current, userMessage: answer.trim() });
+    if (!answer.trim() || !sessionId) return;
+    vscode?.postMessage({ type: 'sendMessage', sessionId, userMessage: answer.trim() });
     setAnswer('');
   };
 
@@ -113,11 +88,10 @@ export default function App() {
   };
 
   return (
-    <div style={s.wrap}>
+    <div style={{ padding: 16, fontFamily: 'var(--vscode-font-family)', color: 'var(--vscode-editor-foreground)' }}>
       <h2 style={{ margin: '0 0 12px', fontSize: 16 }}>⚡ PromptOS</h2>
 
-      {apiError && <div style={s.apiErr}>⚠️ {apiError}</div>}
-
+      {/* Idle — prompt entry */}
       {phase === 'idle' && (
         <>
           <textarea
@@ -125,12 +99,15 @@ export default function App() {
             value={rawPrompt}
             onChange={(e) => setRawPrompt(e.target.value)}
             rows={4}
-            style={{ ...s.input, resize: 'vertical' }}
+            style={{ width: '100%', boxSizing: 'border-box', background: 'var(--vscode-input-background)', color: 'var(--vscode-input-foreground)', border: '1px solid var(--vscode-input-border)', borderRadius: 6, padding: 8, resize: 'vertical' }}
           />
-          <button onClick={handleStart} style={s.btn}>Start Refinement →</button>
+          <button onClick={handleStart} style={{ marginTop: 8, width: '100%', padding: '8px 0', background: 'var(--vscode-button-background)', color: 'var(--vscode-button-foreground)', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+            Start Refinement →
+          </button>
         </>
       )}
 
+      {/* Asking — question loop */}
       {phase === 'asking' && (
         <>
           <p style={{ fontSize: 12, color: 'var(--vscode-descriptionForeground)' }}>Question {turnNum} of ~4</p>
@@ -141,42 +118,59 @@ export default function App() {
             onChange={(e) => setAnswer(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAnswer()}
             placeholder="Your answer..."
-            style={s.input}
+            style={{ width: '100%', boxSizing: 'border-box', background: 'var(--vscode-input-background)', color: 'var(--vscode-input-foreground)', border: '1px solid var(--vscode-input-border)', borderRadius: 6, padding: 8 }}
           />
-          <button onClick={handleAnswer} style={s.btn}>Submit →</button>
+          <button onClick={handleAnswer} style={{ marginTop: 8, width: '100%', padding: '8px 0', background: 'var(--vscode-button-background)', color: 'var(--vscode-button-foreground)', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+            Submit →
+          </button>
         </>
       )}
 
+      {/* Refused — Refusal Engine fired */}
       {phase === 'refused' && (
-        <div style={s.error}>
+        <div style={{ background: '#f59e0b22', border: '1px solid #f59e0b', borderRadius: 8, padding: 12 }}>
           <p style={{ margin: 0, fontWeight: 600 }}>🚫 {refuseMsg}</p>
-          <button onClick={reset} style={{ ...s.linkBtn, marginTop: 8, width: 'auto' }}>Start over</button>
+          <button onClick={() => setPhase('idle')} style={{ marginTop: 8, background: 'transparent', color: 'var(--vscode-textLink-foreground)', border: 'none', cursor: 'pointer', padding: 0 }}>
+            Start over
+          </button>
         </div>
       )}
 
+      {/* Complete — show assembled prompt + scores */}
       {phase === 'complete' && (
         <>
           <p style={{ fontWeight: 600, marginBottom: 6 }}>✅ Assembled Prompt</p>
-          <pre style={s.pre}>{assembled}</pre>
+          <pre style={{ fontSize: 11, background: 'var(--vscode-textCodeBlock-background)', padding: 10, borderRadius: 6, whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 200, overflow: 'auto' }}>
+            {assembled}
+          </pre>
           {scores && (
             <div style={{ marginTop: 10, fontSize: 12, color: 'var(--vscode-descriptionForeground)' }}>
-              Depth: {scores.thinking_depth_score}/100 · Dep: {scores.dependency_score}/100 · Turns saved: {scores.estimated_turns_saved}
+              <div>Depth: {scores.thinking_depth_score}/100 · Dep: {scores.dependency_score}/100 · Turns saved: {scores.estimated_turns_saved}</div>
             </div>
           )}
-          <button onClick={handleSendToTerminal} style={{ ...s.btn, background: '#2563eb', color: '#fff' }}>
+          <button onClick={handleSendToTerminal} style={{ marginTop: 10, width: '100%', padding: '8px 0', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
             Send to Claude Code →
           </button>
-          <button onClick={reset} style={s.linkBtn}>New session</button>
+          <button onClick={() => { setPhase('idle'); setRawPrompt(''); setAssembled(''); setScores(null); }} style={{ marginTop: 6, width: '100%', padding: '6px 0', background: 'transparent', color: 'var(--vscode-textLink-foreground)', border: 'none', cursor: 'pointer' }}>
+            New session
+          </button>
         </>
       )}
 
+      {/* Sent to terminal */}
       {phase === 'sent' && (
         <div style={{ textAlign: 'center', padding: 24 }}>
           <p style={{ fontSize: 24 }}>🚀</p>
           <p>Prompt sent to terminal!</p>
-          <button onClick={reset} style={s.linkBtn}>New session</button>
+          <button onClick={() => { setPhase('idle'); setRawPrompt(''); setAssembled(''); setScores(null); }} style={{ marginTop: 8, background: 'transparent', color: 'var(--vscode-textLink-foreground)', border: 'none', cursor: 'pointer' }}>
+            New session
+          </button>
         </div>
       )}
     </div>
   );
 }
+
+// Mount
+const root = document.getElementById('root');
+if (root) createRoot(root).render(<App />);
