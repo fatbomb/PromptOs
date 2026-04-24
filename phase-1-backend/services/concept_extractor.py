@@ -9,6 +9,7 @@ then upserts them into the `concept_map` Supabase table.
 import json
 from google import genai
 from services.supabase_client import upsert_concept_db
+from services.gemini import get_client
 
 EXTRACT_PROMPT = """Extract the core programming/engineering concepts from this prompt.
 Output ONLY a JSON array of short concept strings (2–4 words max each).
@@ -19,7 +20,7 @@ Prompt:
 
 Output ONLY valid JSON array:"""
 
-_client = genai.Client()
+# Client will be lazily initialized via get_client()
 
 
 async def extract_and_store_concepts(
@@ -36,7 +37,7 @@ async def extract_and_store_concepts(
         prompt = EXTRACT_PROMPT.format(assembled_prompt=assembled_prompt)
         
         # Use native async method from the new genai SDK
-        response = await _client.aio.models.generate_content(
+        response = await get_client().aio.models.generate_content(
             model="gemini-3-flash-preview",
             contents=prompt,
         )

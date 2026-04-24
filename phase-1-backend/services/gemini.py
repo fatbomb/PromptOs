@@ -12,8 +12,19 @@ import json
 from google import genai
 from google.genai import types
 
-# Initialize the new SDK client. It will automatically pick up GEMINI_API_KEY from the environment.
-_client = genai.Client()
+# Lazy-initialize the client to ensure environment variables are loaded first.
+_client_instance = None
+
+def get_client():
+    global _client_instance
+    if _client_instance is None:
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+             # Fallback to GOOGLE_API_KEY if GEMINI_API_KEY is not set
+             api_key = os.environ.get("GOOGLE_API_KEY")
+        
+        _client_instance = genai.Client(api_key=api_key)
+    return _client_instance
 
 SYSTEM_PROMPT = """You are a prompt refinement agent. Your job is to help a developer write a better prompt for their AI coding assistant.
 
@@ -95,7 +106,7 @@ async def run_conversation_turn(
     )
 
     # Use the native async method from the new genai SDK
-    response = await _client.aio.models.generate_content(
+    response = await get_client().aio.models.generate_content(
         model="gemini-2.5-flash-lite",
         contents=user_message,
         config=config,
@@ -117,7 +128,7 @@ async def check_refusal(hypothesis: str) -> dict:
         temperature=0.1,
     )
 
-    response = await _client.aio.models.generate_content(
+    response = await get_client().aio.models.generate_content(
         model="gemini-2.5-flash-lite",
         contents=f"Developer hypothesis: {hypothesis}",
         config=config,
