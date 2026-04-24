@@ -171,6 +171,7 @@ async function askNextQuestion(shadow, hostDiv, inputEl, sessionId, userMessage,
                 hostDiv.remove();
             });
             shadow.getElementById('promptos-cancel-btn')?.addEventListener('click', () => hostDiv.remove());
+            shadow.getElementById('promptos-close-btn')?.addEventListener('click', () => hostDiv.remove());
         }
         return;
     }
@@ -234,7 +235,7 @@ function buildInitialUI(rawPrompt) {
         <button id="promptos-close-btn" class="close-btn">×</button>
       </div>
       <div class="modal-body">
-        <p class="label">Your current prompt:</p>
+        <p class="label">Your current prompt</p>
         <pre class="prompt-preview">${escapeHtml(rawPrompt || '(empty — type a prompt first)')}</pre>
         <button id="promptos-start-btn" class="primary-btn">Start Refinement →</button>
       </div>
@@ -246,21 +247,31 @@ function loadingHTML(msg) {
     return `
     <div class="modal">
       <div class="modal-body center">
-        <div class="spinner"></div>
-        <p>${escapeHtml(msg)}</p>
+        <div class="spinner-wrap">
+          <div class="spinner"></div>
+          <span>${escapeHtml(msg)}</span>
+        </div>
       </div>
     </div>
   `;
 }
 function questionHTML(question, turn) {
+    const dots = Array.from({ length: 4 }, (_, i) => `<span class="step-dot${i < turn ? ' active' : ''}"></span>`).join('');
     return `
     <div class="modal">
       <div class="modal-header">
-        <span class="modal-title">⚡ PromptOS — Question ${turn} of ~4</span>
+        <span class="modal-title">⚡ PromptOS</span>
+        <div class="step-info">
+          <span>Q${turn} of ~4</span>
+          <div class="step-dots">${dots}</div>
+        </div>
+        <div style="width:24px"></div>
       </div>
       <div class="modal-body">
-        <p class="question-text">${escapeHtml(question)}</p>
-        <input id="promptos-answer-input" class="answer-input" type="text" placeholder="Your answer..." autocomplete="off" />
+        <div class="question-card">
+          <p class="question-text">${escapeHtml(question)}</p>
+        </div>
+        <input id="promptos-answer-input" class="answer-input" type="text" placeholder="Your answer... (Enter to submit)" autocomplete="off" />
         <button id="promptos-submit-btn" class="primary-btn">Submit →</button>
       </div>
     </div>
@@ -269,30 +280,53 @@ function questionHTML(question, turn) {
 function refusalHTML(message) {
     return `
     <div class="modal">
-      <div class="modal-body center">
-        <p class="refuse-msg">🚫 ${escapeHtml(message ?? 'You already know the answer. Try implementing it.')}</p>
+      <div class="modal-body">
+        <div class="refuse-card">
+          <p class="refuse-title">🚫 Refusal Engine</p>
+          <p class="refuse-msg">${escapeHtml(message ?? 'You already know the answer. Try implementing it.')}</p>
+        </div>
         <button id="promptos-restart-btn" class="secondary-btn">Close</button>
       </div>
     </div>
   `;
 }
+function scoreBarHTML(val) {
+    const color = val >= 75 ? '#10B981' : val >= 40 ? '#F59E0B' : '#EF4444';
+    const filled = Math.round((val / 100) * 16);
+    const bar = `<span style="color:${color}">${'█'.repeat(filled)}</span>${'░'.repeat(16 - filled)}`;
+    return `<span class="score-bar">${bar}</span>`;
+}
 function completeHTML(assembled, scores) {
-    const scoreBar = scores
-        ? `<div class="scores">
-        <span>Depth: ${scores.thinking_depth_score}/100</span>
-        <span>Dep: ${scores.dependency_score}/100</span>
-        <span>Turns saved: ${scores.estimated_turns_saved}</span>
-       </div>`
-        : '';
+    const scoresHTML = scores ? `
+    <div class="scores">
+      <div class="score-row">
+        <span class="score-label">Token Efficiency</span>
+        <span class="score-val" style="color:${scores.token_efficiency_score >= 75 ? '#10B981' : scores.token_efficiency_score >= 40 ? '#F59E0B' : '#EF4444'}">${scores.token_efficiency_score}</span>
+        ${scoreBarHTML(scores.token_efficiency_score)}
+      </div>
+      <div class="score-row">
+        <span class="score-label">Thinking Depth</span>
+        <span class="score-val" style="color:${scores.thinking_depth_score >= 75 ? '#10B981' : scores.thinking_depth_score >= 40 ? '#F59E0B' : '#EF4444'}">${scores.thinking_depth_score}</span>
+        ${scoreBarHTML(scores.thinking_depth_score)}
+      </div>
+      <div class="score-row">
+        <span class="score-label">AI Dependency</span>
+        <span class="score-val" style="color:${scores.dependency_score >= 75 ? '#10B981' : scores.dependency_score >= 40 ? '#F59E0B' : '#EF4444'}">${scores.dependency_score}</span>
+        ${scoreBarHTML(scores.dependency_score)}
+      </div>
+      <div class="turns-saved">Turns saved: <strong style="color:#10B981">${scores.estimated_turns_saved}</strong></div>
+    </div>
+  ` : '';
     return `
     <div class="modal">
       <div class="modal-header">
-        <span class="modal-title">✅ Assembled Prompt</span>
+        <span class="modal-title">✦ Assembled Prompt</span>
+        <button id="promptos-close-btn" class="close-btn">×</button>
       </div>
       <div class="modal-body">
         <pre class="assembled-prompt">${escapeHtml(assembled)}</pre>
-        ${scoreBar}
-        <button id="promptos-inject-btn-confirm" class="primary-btn">Inject into chat →</button>
+        ${scoresHTML}
+        <button id="promptos-inject-btn-confirm" class="accent-btn">Inject into chat →</button>
         <button id="promptos-cancel-btn" class="secondary-btn">Cancel</button>
       </div>
     </div>
@@ -301,9 +335,11 @@ function completeHTML(assembled, scores) {
 function errorHTML(msg) {
     return `
     <div class="modal">
-      <div class="modal-body center">
-        <p class="error-msg">⚠️ ${escapeHtml(msg)}</p>
-        <p class="hint">Make sure the PromptOS backend is running on localhost:8000.</p>
+      <div class="modal-body">
+        <div class="error-card">
+          <p class="error-msg">⚠️ ${escapeHtml(msg)}</p>
+          <p class="hint">Make sure the PromptOS backend is running on localhost:8000.</p>
+        </div>
       </div>
     </div>
   `;
@@ -323,44 +359,76 @@ function overlayCSS() {
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     .modal {
-      background: #1e1e2e;
-      color: #cdd6f4;
-      border: 1px solid #313244;
-      border-radius: 12px;
-      width: 480px;
-      max-width: 95vw;
-      max-height: 80vh;
+      background: #0f0f17;
+      color: #e2e8f0;
+      border: 1px solid #1e1b2e;
+      border-top: 2px solid transparent;
+      border-image: linear-gradient(90deg, #7C3AED, #06B6D4, #10B981) 1 0 0 0;
+      border-radius: 14px;
+      width: 500px;
+      max-width: 96vw;
+      max-height: 82vh;
       display: flex;
       flex-direction: column;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 14px;
       overflow: hidden;
-      box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+      box-shadow: 0 32px 80px rgba(0,0,0,0.7), 0 0 0 1px #1e1b2e;
     }
 
     .modal-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 14px 16px;
-      border-bottom: 1px solid #313244;
+      padding: 13px 16px 12px;
+      border-bottom: 1px solid #1e1b2e;
+      background: #0d0d14;
     }
 
     .modal-title {
       font-weight: 700;
-      font-size: 15px;
+      font-size: 14px;
+      background: linear-gradient(90deg, #7C3AED, #06B6D4, #10B981);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.2px;
     }
+
+    .step-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: #6B7280;
+    }
+
+    .step-dots {
+      display: flex;
+      gap: 4px;
+    }
+
+    .step-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #374151;
+      transition: background 0.2s;
+    }
+
+    .step-dot.active { background: #7C3AED; }
 
     .close-btn {
       background: none;
       border: none;
-      color: #6c7086;
-      font-size: 20px;
+      color: #4B5563;
+      font-size: 18px;
       cursor: pointer;
       line-height: 1;
-      padding: 0 4px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      transition: color 0.15s, background 0.15s;
     }
-    .close-btn:hover { color: #cdd6f4; }
+    .close-btn:hover { color: #e2e8f0; background: #1e1b2e; }
 
     .modal-body {
       padding: 16px;
@@ -373,103 +441,187 @@ function overlayCSS() {
     .modal-body.center {
       align-items: center;
       text-align: center;
+      justify-content: center;
+      min-height: 120px;
     }
 
     .label {
-      font-size: 12px;
-      color: #6c7086;
+      font-size: 10px;
+      color: #6B7280;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.08em;
+      font-weight: 600;
     }
 
-    .prompt-preview, .assembled-prompt {
-      background: #181825;
-      border: 1px solid #313244;
+    .prompt-preview {
+      background: #0d0d14;
+      border: 1px solid #1e1b2e;
+      border-left: 3px solid #7C3AED;
       border-radius: 8px;
       padding: 10px 12px;
       font-size: 12px;
       white-space: pre-wrap;
       word-break: break-word;
-      max-height: 140px;
+      max-height: 100px;
       overflow-y: auto;
-      color: #a6e3a1;
+      color: #a78bfa;
       font-family: 'Fira Code', 'Cascadia Code', monospace;
+      line-height: 1.5;
+    }
+
+    .assembled-prompt {
+      background: #0d0d14;
+      border: 1px solid #1e1b2e;
+      border-left: 3px solid #10B981;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 160px;
+      overflow-y: auto;
+      color: #6ee7b7;
+      font-family: 'Fira Code', 'Cascadia Code', monospace;
+      line-height: 1.5;
+    }
+
+    .question-card {
+      background: #0d0d14;
+      border: 1px solid #1e1b2e;
+      border-left: 3px solid #7C3AED;
+      border-radius: 8px;
+      padding: 12px 14px;
     }
 
     .question-text {
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 600;
-      line-height: 1.5;
+      line-height: 1.55;
+      color: #e2e8f0;
     }
 
     .answer-input {
       width: 100%;
-      background: #181825;
-      border: 1px solid #45475a;
+      background: #0d0d14;
+      border: 1px solid #374151;
       border-radius: 8px;
       padding: 10px 12px;
-      color: #cdd6f4;
+      color: #e2e8f0;
       font-size: 14px;
       outline: none;
+      transition: border-color 0.15s;
     }
-    .answer-input:focus { border-color: #89b4fa; }
+    .answer-input:focus { border-color: #7C3AED; box-shadow: 0 0 0 2px #7C3AED22; }
 
     .primary-btn {
       width: 100%;
       padding: 10px;
-      background: #2563eb;
+      background: linear-gradient(90deg, #7C3AED, #06B6D4);
       color: #fff;
       border: none;
       border-radius: 8px;
       font-size: 14px;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.15s;
+      transition: opacity 0.15s;
+      letter-spacing: 0.1px;
     }
-    .primary-btn:hover { background: #1d4ed8; }
+    .primary-btn:hover { opacity: 0.9; }
+    .primary-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .accent-btn {
+      width: 100%;
+      padding: 10px;
+      background: linear-gradient(90deg, #10B981, #06B6D4);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .accent-btn:hover { opacity: 0.9; }
 
     .secondary-btn {
       width: 100%;
       padding: 8px;
       background: transparent;
-      color: #89b4fa;
-      border: 1px solid #313244;
+      color: #06B6D4;
+      border: 1px solid #1e1b2e;
       border-radius: 8px;
       font-size: 13px;
       cursor: pointer;
+      transition: background 0.15s;
     }
-    .secondary-btn:hover { background: #313244; }
+    .secondary-btn:hover { background: #1e1b2e; }
 
     .scores {
       display: flex;
-      gap: 12px;
-      font-size: 12px;
-      color: #6c7086;
+      flex-direction: column;
+      gap: 6px;
+      background: #0d0d14;
+      border: 1px solid #1e1b2e;
+      border-radius: 8px;
+      padding: 10px 12px;
     }
 
-    .refuse-msg {
-      font-size: 15px;
-      font-weight: 600;
-      color: #f9e2af;
+    .score-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
     }
 
-    .error-msg {
-      font-size: 14px;
-      color: #f38ba8;
+    .score-label { color: #6B7280; width: 110px; flex-shrink: 0; }
+    .score-val   { font-weight: 700; width: 28px; }
+    .score-bar   { font-family: monospace; font-size: 10px; letter-spacing: -1px; }
+
+    .turns-saved {
+      font-size: 10px;
+      color: #6B7280;
+      margin-top: 2px;
     }
 
-    .hint {
-      font-size: 12px;
-      color: #6c7086;
+    .refuse-card {
+      background: #1a1200;
+      border: 1px solid #F59E0B44;
+      border-left: 3px solid #F59E0B;
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+
+    .refuse-title { font-weight: 700; font-size: 13px; color: #F59E0B; margin-bottom: 6px; }
+    .refuse-msg   { font-size: 13px; color: #e2e8f0; line-height: 1.5; }
+
+    .error-card {
+      background: #1a0808;
+      border: 1px solid #EF444444;
+      border-left: 3px solid #EF4444;
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+
+    .error-msg { font-size: 13px; color: #fca5a5; margin-bottom: 4px; }
+    .hint      { font-size: 11px; color: #6B7280; }
+
+    .spinner-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #06B6D4;
+      font-size: 13px;
     }
 
     .spinner {
-      width: 28px;
-      height: 28px;
-      border: 3px solid #313244;
-      border-top-color: #89b4fa;
+      width: 18px;
+      height: 18px;
+      border: 2px solid #1e1b2e;
+      border-top-color: #7C3AED;
+      border-right-color: #06B6D4;
       border-radius: 50%;
       animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
     }
 
     @keyframes spin { to { transform: rotate(360deg); } }

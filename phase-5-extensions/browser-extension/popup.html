@@ -5,39 +5,99 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PromptOS</title>
   <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      width: 260px;
+      width: 280px;
       padding: 16px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #1e1e2e;
-      color: #cdd6f4;
-      margin: 0;
+      background: #0f0f17;
+      color: #e2e8f0;
     }
-    h2 { font-size: 15px; margin: 0 0 8px; }
-    p  { font-size: 13px; color: #6c7086; margin: 0 0 12px; line-height: 1.5; }
-    a  {
-      display: block;
-      text-align: center;
-      padding: 8px;
-      background: #2563eb;
-      color: #fff;
-      border-radius: 8px;
-      text-decoration: none;
-      font-size: 13px;
-      font-weight: 600;
+
+    .logo {
+      font-size: 16px;
+      font-weight: 700;
+      background: linear-gradient(90deg, #7C3AED, #06B6D4, #10B981);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 2px;
     }
-    a:hover { background: #1d4ed8; }
-    .status {
-      margin-top: 12px;
+
+    .tagline {
       font-size: 11px;
-      color: #45475a;
-      text-align: center;
+      color: #6B7280;
+      margin-bottom: 14px;
     }
+
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, #7C3AED44, #06B6D444, transparent);
+      margin-bottom: 14px;
+    }
+
+    .instruction {
+      font-size: 12px;
+      color: #9CA3AF;
+      line-height: 1.6;
+      margin-bottom: 14px;
+    }
+
+    .instruction strong { color: #e2e8f0; }
+
+    .sites {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    .site-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #0d0d14;
+      border: 1px solid #1e1b2e;
+      border-radius: 8px;
+      padding: 7px 10px;
+      font-size: 12px;
+      color: #9CA3AF;
+    }
+
+    .site-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #10B981;
+      flex-shrink: 0;
+    }
+
+    .status {
+      font-size: 10px;
+      color: #374151;
+      text-align: center;
+      padding-top: 10px;
+      border-top: 1px solid #1e1b2e;
+    }
+
+    .status span { color: #7C3AED; }
   </style>
 </head>
 <body>
-  <h2>⚡ PromptOS</h2>
-  <p>Navigate to <strong>claude.ai</strong> or <strong>chat.openai.com</strong> — the "Enhance with PromptOS" button will appear automatically.</p>
-  <p class="status">Backend: localhost:8000</p>
+  <div class="logo">⚡ PromptOS</div>
+  <div class="tagline">prompt refinement layer</div>
+  <div class="divider"></div>
+
+  <p class="instruction">
+    Navigate to a supported site — the
+    <strong>"Enhance with PromptOS"</strong> button will appear automatically below the chat input.
+  </p>
+
+  <div class="sites">
+    <div class="site-chip"><span class="site-dot"></span>claude.ai</div>
+    <div class="site-chip"><span class="site-dot"></span>chat.openai.com</div>
+  </div>
+
+  <div class="status">Backend: <span>localhost:8000</span></div>
 </body>
 </html>
