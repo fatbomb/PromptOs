@@ -26,9 +26,14 @@ export default async function DashboardPage() {
   const { data: { session } } = await supabase.auth.getSession();
   const user = session?.user;
 
-  // If there's an auth cookie parsing error due to localhost environments,
-  // we fallback to the seeded dummy user UUID so the UI is visible for development.
-  const userId = user?.id || '47e886ff-1710-43ac-8b61-78b99e952f5d';
+  // Use getUser() as fallback — validates token server-side even if cookie parsing fails
+  let userId = user?.id;
+  if (!userId) {
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    userId = authUser?.id;
+  }
+  // Last resort fallback for seeded demo data
+  userId = userId || '47e886ff-1710-43ac-8b61-78b99e952f5d';
 
   // Fetch token savings summary
   const { data: savings } = await supabase
