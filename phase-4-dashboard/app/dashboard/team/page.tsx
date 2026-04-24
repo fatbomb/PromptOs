@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import TeamActions from '@/components/TeamActions';
+import CopyInviteButton from '@/components/CopyInviteButton';
 
 export default async function TeamPage() {
   const cookieStore = cookies();
@@ -108,15 +109,7 @@ export default async function TeamPage() {
                   <button className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-[var(--text-primary)] font-semibold text-sm transition-colors border border-white/10">
                     Team Settings
                   </button>
-                  <button 
-                    onClick={() => {
-                        navigator.clipboard.writeText(teamInfo.invite_code);
-                        alert('Invite code copied!');
-                    }}
-                    className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-sm transition-colors shadow-[0_0_15px_rgba(6,182,212,0.4)]"
-                  >
-                    Copy Invite Code
-                  </button>
+                  <CopyInviteButton inviteCode={teamInfo.invite_code} />
                </div>
             </div>
 
