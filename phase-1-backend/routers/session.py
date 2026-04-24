@@ -27,7 +27,8 @@ router = APIRouter()
 class StartSessionRequest(BaseModel):
     raw_prompt: str
     workspace_context: dict | None = None  # VS Code auto-extracted context
-    mode: str = "default"  # "default", "basic", "skip"
+    mode: str = "default"  # "default", "mid", "skip"
+    target_tool: str | None = None  # e.g. "gemini", "claude" — used to tailor the assembled prompt
 
 
 class MessageRequest(BaseModel):
@@ -58,6 +59,7 @@ async def start_session(req: StartSessionRequest, user=Depends(get_current_user)
         "raw_prompt": req.raw_prompt,
         "workspace_context": req.workspace_context or {},
         "mode": req.mode,
+        "target_tool": req.target_tool,
         "conversation_history": [],
         "assembled_prompt": None,
         "scores": None,
@@ -85,6 +87,7 @@ async def send_message(req: MessageRequest, user=Depends(get_current_user)):
         conversation_history=session["conversation_history"],
         workspace_context=session["workspace_context"],
         mode=session.get("mode", "default"),
+        target_tool=session.get("target_tool"),
     )
 
     if gemini_response.get("done"):

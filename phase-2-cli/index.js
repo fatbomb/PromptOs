@@ -16,36 +16,38 @@ program
   .name('promptos')
   .description('Prompt refinement layer for AI coding assistants')
   .version('1.0.0')
+  .option('-s, --skip', 'Skip all questions — PromptOS auto-formats the prompt for your target tool')
+  .option('-m, --mid', 'Quick mode: at most 3 clarifying questions, then auto-format')
   .showHelpAfterError('(Run "promptos --help" to see a list of all available commands)')
   .showSuggestionAfterError();
 
 program
   .command('ask [prompt...]')
   .description('Refine a prompt through the PromptOS conversation flow')
-  .option('--skip', 'Skip refinement and send 0-shot prompt directly (shows skip penalty)')
-  .option('--basic', 'Basic mode: max 3 questions')
-  .action((promptArr, options) => askCommand(promptArr.join(' '), options));
+  .action((promptArr, options, command) => 
+    askCommand(promptArr.join(' '), command.optsWithGlobals())
+  );
 
 program
   .command('run <tool> [prompt...]')
   .description('Refine prompt then automatically send to a specific CLI tool (e.g. claude, gemini)')
-  .option('--skip', 'Skip refinement and send 0-shot prompt directly')
-  .option('--basic', 'Basic mode: max 3 questions')
-  .action((tool, promptArr, options) => runCommand(tool, promptArr.join(' '), options));
+  .action((tool, promptArr, options, command) => 
+    runCommand(tool, promptArr.join(' '), command.optsWithGlobals())
+  );
 
 program
   .command('claude [prompt...]')
   .description('Alias for: promptos run claude')
-  .option('--skip', 'Skip refinement and send 0-shot prompt directly')
-  .option('--basic', 'Basic mode: max 3 questions')
-  .action((promptArr, options) => runCommand('claude', promptArr.join(' '), options));
+  .action((promptArr, options, command) => 
+    runCommand('claude', promptArr.join(' '), command.optsWithGlobals())
+  );
 
 program
   .command('gemini [prompt...]')
   .description('Alias for: promptos run gemini')
-  .option('--skip', 'Skip refinement and send 0-shot prompt directly')
-  .option('--basic', 'Basic mode: max 3 questions')
-  .action((promptArr, options) => runCommand('gemini', promptArr.join(' '), options));
+  .action((promptArr, options, command) => 
+    runCommand('gemini', promptArr.join(' '), command.optsWithGlobals())
+  );
 
 program
   .command('login')

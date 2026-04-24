@@ -6,7 +6,7 @@ export async function runCommand(toolName, rawPrompt, options) {
   console.log(chalk.cyan(`\n🔁 Running PromptOS refinement before sending to ${toolName}...\n`));
 
   // Run the ask flow; after completion the assembled prompt is returned.
-  const assembledPrompt = await askCommand(rawPrompt, options);
+  const assembledPrompt = await askCommand(rawPrompt, options, toolName);
 
   if (!assembledPrompt) {
     console.log(chalk.red('\n❌ No assembled prompt returned. Aborting.'));

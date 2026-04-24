@@ -26,26 +26,92 @@ def get_client():
         _client_instance = genai.Client(api_key=api_key)
     return _client_instance
 
-SYSTEM_PROMPT = """You are a prompt refinement agent. Your job is to help a developer write a better prompt for their AI coding assistant.
+# ---------------------------------------------------------------------------
+# System prompt variants — base (general), Gemini-optimised, Claude-optimised
+# ---------------------------------------------------------------------------
+
+_BASE_RULES = """\
+Rules:
+- Ask ONE question per turn. Never two.
+- Use workspace_context to skip questions you can auto-answer.
+- When assembling, include key details like file paths, error messages, expected vs actual behaviour, and developer hypotheses.
+- Never invent context the developer didn't provide.
+- Output ONLY raw JSON — no markdown, no code fences."""
+
+SYSTEM_PROMPT = f"""You are a prompt refinement agent. Your job is to help a developer write a better prompt for their AI coding assistant.
 
 Given the developer's raw prompt and conversation so far, output ONLY valid JSON:
 
 If more context needed:
-{"question": "Which file is this happening in?", "why": "file path needed", "done": false}
+{{"question": "Which file is this happening in?", "why": "file path needed", "done": false}}
 
-If you have enough context (after 3-5 questions):
-{"done": true, "assembled_prompt": "...[full structured prompt]...", "category": "bug_fix"}
+If you have enough context (after 3-6 questions):
+{{"done": true, "assembled_prompt": "...[full structured prompt]...", "category": "bug_fix"}}
 
 If developer clearly knows the answer already:
-{"done": true, "should_refuse": true, "reason": "You already know: [their hypothesis]"}
+{{"done": true, "should_refuse": true, "reason": "You already know: [their hypothesis]"}}
 
-Rules:
-- Ask ONE question per turn. Never two.
-- Use workspace_context to skip questions you can auto-answer.
-- Stop at 5 questions maximum.
-- When assembling, you MUST include these exact literal words in your assembled_prompt text: "file", "error", "expected", "tried", "suspicion".
-- Never invent context the developer didn't provide.
-- Output ONLY raw JSON — no markdown, no code fences."""
+{_BASE_RULES}
+- Stop at 6 questions maximum."""
+
+# Gemini-optimised variant: Gemini handles structured XML-style sections well.
+SYSTEM_PROMPT_GEMINI = f"""You are a prompt refinement agent that produces prompts optimised for Google Gemini.
+
+Given the developer's raw prompt and conversation so far, output ONLY valid JSON.
+
+If more context needed:
+{{"question": "Which file is this happening in?", "why": "file path needed", "done": false}}
+
+When assembling, produce a Gemini-optimised prompt using this structure inside assembled_prompt:
+<task>[One-sentence task description]</task>
+<context>[File names, error messages, stack traces, environment]</context>
+<expected>[What should happen]</expected>
+<actual>[What is happening]</actual>
+<hypothesis>[Developer's suspicion, if any]</hypothesis>
+<ask>[Specific, actionable request]</ask>
+
+Return JSON when done:
+{{"done": true, "assembled_prompt": "...", "category": "bug_fix"}}
+
+If developer clearly knows the answer already:
+{{"done": true, "should_refuse": true, "reason": "You already know: [hypothesis]"}}
+
+{_BASE_RULES}"""
+
+# Claude-optimised variant: Claude works best with clear natural-language markdown structure.
+SYSTEM_PROMPT_CLAUDE = f"""You are a prompt refinement agent that produces prompts optimised for Anthropic Claude.
+
+Given the developer's raw prompt and conversation so far, output ONLY valid JSON.
+
+If more context needed:
+{{"question": "Which file is this happening in?", "why": "file path needed", "done": false}}
+
+When assembling, produce a Claude-optimised prompt with this natural markdown layout inside assembled_prompt:
+## Task
+[One-sentence task description]
+
+## Context
+[File names, error messages, stack traces, environment details]
+
+## Expected Behaviour
+[What should happen]
+
+## Actual Behaviour
+[What is happening]
+
+## My Hypothesis
+[Developer's suspicion, if any]
+
+## Request
+[Specific, actionable request for Claude]
+
+Return JSON when done:
+{{"done": true, "assembled_prompt": "...", "category": "bug_fix"}}
+
+If developer clearly knows the answer already:
+{{"done": true, "should_refuse": true, "reason": "You already know: [hypothesis]"}}
+
+{_BASE_RULES}"""
 
 REFUSAL_PROMPT = """You are evaluating whether a developer already knows how to solve their problem.
 
@@ -71,10 +137,11 @@ async def run_conversation_turn(
     conversation_history: list[dict],
     workspace_context: dict,
     mode: str = "default",
+    target_tool: str | None = None,
 ) -> dict:
     """
-    Task 1.3 — Calls Gemini Flash with the full conversation history.
-    Returns either a next question or the assembled prompt.
+    Calls Gemini Flash with the full conversation history.
+    Applies mode logic (skip / mid / default) and tool-specific prompt optimisation.
     """
     context_block = ""
     if workspace_context:
@@ -90,22 +157,48 @@ async def run_conversation_turn(
         "What should happen next?"
     )
 
-    dynamic_system_prompt = SYSTEM_PROMPT
-    if mode == "basic":
-        dynamic_system_prompt = SYSTEM_PROMPT.replace("Stop at 5 questions maximum.", "Stop at 3 questions maximum.")
-        dynamic_system_prompt = dynamic_system_prompt.replace("after 3-5 questions", "after 1-3 questions")
-    elif mode == "skip":
-        dynamic_system_prompt = SYSTEM_PROMPT.replace(
-            "Ask ONE question per turn. Never two.",
-            "DO NOT ASK ANY QUESTIONS. Immediately assemble the prompt and return done: true."
-        ).replace("after 3-5 questions", "IMMEDIATELY (0 questions)")
+    # -----------------------------------------------------------------------
+    # Select the right base system prompt based on target tool
+    # -----------------------------------------------------------------------
+    tool_key = (target_tool or "").lower()
+    if tool_key == "gemini":
+        base_prompt = SYSTEM_PROMPT_GEMINI
+    elif tool_key == "claude":
+        base_prompt = SYSTEM_PROMPT_CLAUDE
+    else:
+        base_prompt = SYSTEM_PROMPT
+
+    # -----------------------------------------------------------------------
+    # Apply mode-specific overrides
+    # -----------------------------------------------------------------------
+    if mode == "skip":
+        # 0 questions — immediately assemble using the tool-specific structure
+        dynamic_system_prompt = (
+            base_prompt
+            + "\n\nMODE OVERRIDE — SKIP: You MUST NOT ask any questions. "
+            "Immediately assemble the best possible prompt from the raw input alone and return done=true. "
+            "Use any workspace_context available to fill gaps."
+        )
+    elif mode == "mid":
+        # ≤ 3 questions — then assemble using the tool-specific structure
+        dynamic_system_prompt = (
+            base_prompt
+            + "\n\nMODE OVERRIDE — MID: You may ask AT MOST 3 questions total. "
+            "If you already have enough context, assemble immediately. "
+            "Prioritise the single most impactful clarifying question each turn."
+        )
+    else:
+        # default — up to 6 questions
+        dynamic_system_prompt = (
+            base_prompt
+            + "\n\nMODE: Default. You may ask up to 6 questions before assembling."
+        )
 
     config = types.GenerateContentConfig(
         system_instruction=dynamic_system_prompt,
         temperature=0.2,
     )
 
-    # Use the native async method from the new genai SDK
     response = await get_client().aio.models.generate_content(
         model="gemini-2.5-flash-lite",
         contents=user_message,

@@ -16,18 +16,22 @@ import { printReceipt } from '../utils/receipt.js';
 
 const API = process.env.PROMPTOS_API_BASE_URL || 'http://localhost:8000';
 
-export async function askCommand(rawPrompt, options) {
+export async function askCommand(rawPrompt, options, targetTool = null) {
   const token = await ensureAuth();
 
   let mode = 'default';
   if (options.skip) mode = 'skip';
-  else if (options.basic) mode = 'basic';
+  else if (options.mid) mode = 'mid';
 
   if (mode === 'skip') {
-    console.log(chalk.yellow('\n⚠  Skip mode. PromptOS will format a 0-shot prompt immediately without asking questions.\n'));
+    const toolLabel = targetTool ? chalk.bold(targetTool) : 'your target tool';
+    console.log(chalk.yellow(`\n⚡ Skip mode — PromptOS will auto-format a prompt optimised for ${toolLabel} without asking questions.\n`));
     console.log(
-      chalk.dim('Your last 5 skipped sessions averaged 5.2 turns. Your PromptOS sessions average 1.4. That\'s your choice to make.\n')
+      chalk.dim('Tip: use --mid to answer just 1-3 quick questions for a sharper result.\n')
     );
+  } else if (mode === 'mid') {
+    const toolLabel = targetTool ? chalk.bold(targetTool) : 'your target tool';
+    console.log(chalk.cyan(`\n⚡ Mid mode — PromptOS will ask at most 3 questions and auto-format for ${toolLabel}.\n`));
   }
 
   const headers = {
@@ -40,7 +44,7 @@ export async function askCommand(rawPrompt, options) {
   const startRes = await fetch(`${API}/session/start`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ raw_prompt: rawPrompt, mode }),
+    body: JSON.stringify({ raw_prompt: rawPrompt, mode, target_tool: targetTool }),
   }).then((r) => r.json());
   spinner.stop();
 
@@ -79,7 +83,8 @@ export async function askCommand(rawPrompt, options) {
     }
 
     // Show question
-    console.log(chalk.cyan(`\nQuestion ${turn} of ~4:`));
+    const maxTurns = mode === 'mid' ? 3 : 6;
+    console.log(chalk.cyan(`\nQuestion ${turn} of ~${maxTurns}:`));
     const { answer } = await inquirer.prompt([
       {
         type: 'input',
