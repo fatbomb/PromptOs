@@ -4,18 +4,25 @@
  * Clears the PromptOS JWT token from the OS keychain.
  */
 
-import chalk from 'chalk';
-import ora from 'ora';
 import { deleteToken } from '../utils/auth.js';
+import {
+  printCompactBanner,
+  printSuccess,
+  printError,
+  createSpinner,
+} from '../utils/ui.js';
 
 export async function logoutCommand() {
-  const spinner = ora('Logging out...').start();
-  
+  printCompactBanner('logout');
+
+  const spinner = createSpinner('Clearing session token…').start();
+
   try {
     await deleteToken();
-    spinner.succeed(chalk.green('Logged out successfully. Token cleared from keychain.'));
+    spinner.stop();
+    printSuccess('Logged out. Your token has been cleared from the keychain.');
   } catch (err) {
-    spinner.fail(chalk.red('Failed to clear token.'));
-    console.error(err);
+    spinner.fail('Failed to clear token.');
+    printError(err.message);
   }
 }

@@ -2,29 +2,44 @@
  * login command — Phase 2, Task 2.1
  *
  * Opens browser to Google OAuth via Supabase.
- * Polls the backend every 2s (up to 60s) to pick up the CLI JWT token.
- * Saves JWT to ~/.promptos/token via keytar.
+ * Polls the backend every 2s (up to 300s) to pick up the CLI JWT token.
+ * Saves JWT to the OS keychain via keytar.
  */
 
 import open from 'open';
-import ora from 'ora';
 import chalk from 'chalk';
 import crypto from 'crypto';
 import { saveToken } from '../utils/auth.js';
+import {
+  printCompactBanner,
+  printPanel,
+  printSuccess,
+  printError,
+  printDim,
+  createSpinner,
+  colors,
+} from '../utils/ui.js';
 
-const API = process.env.PROMPTOS_API_BASE_URL || 'http://localhost:8000';
+const API           = process.env.PROMPTOS_API_BASE_URL  || 'http://localhost:8000';
 const DASHBOARD_URL = process.env.PROMPTOS_DASHBOARD_URL || 'http://localhost:3000';
 
 export async function loginCommand() {
-  const state = crypto.randomBytes(16).toString('hex');
+  printCompactBanner('login');
+
+  const state    = crypto.randomBytes(16).toString('hex');
   const loginUrl = `${DASHBOARD_URL}/login?state=${state}`;
 
-  console.log(chalk.cyan('\n🔑 Opening browser for Google login...\n'));
+  printPanel(
+    '🔑 Google Authentication',
+    `Opening your browser to complete sign-in.\n` +
+    chalk.hex(colors.muted)(`  URL: ${loginUrl}`),
+    { borderColor: colors.secondary }
+  );
+
   await open(loginUrl);
 
-  const spinner = ora('Waiting for authentication (300s timeout)...').start();
+  const spinner = createSpinner('Waiting for authentication (up to 300s)…').start();
 
-  // Poll every 2 seconds for up to 300 seconds (150 iterations)
   for (let i = 0; i < 150; i++) {
     await _sleep(2000);
     try {
@@ -32,8 +47,9 @@ export async function loginCommand() {
       if (res.ok) {
         const { token } = await res.json();
         await saveToken(token);
-        spinner.succeed(chalk.green('Logged in successfully! ✓'));
-        console.log(chalk.dim('\nRun `promptos stats` to see your profile.\n'));
+        spinner.succeed(chalk.hex(colors.accent)('Logged in successfully!'));
+        printDim('Run `promptos stats` to see your usage stats.');
+        console.log('');
         return;
       }
     } catch {
@@ -41,7 +57,8 @@ export async function loginCommand() {
     }
   }
 
-  spinner.fail(chalk.red('Login timed out. Please try again.'));
+  spinner.fail(chalk.hex(colors.danger)('Login timed out.'));
+  printError('Authentication window expired. Please run `promptos login` again.');
 }
 
 function _sleep(ms) {
