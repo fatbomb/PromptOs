@@ -59,6 +59,7 @@ async def run_conversation_turn(
     raw_prompt: str,
     conversation_history: list[dict],
     workspace_context: dict,
+    mode: str = "default",
 ) -> dict:
     """
     Task 1.3 — Calls Gemini Flash with the full conversation history.
@@ -78,8 +79,18 @@ async def run_conversation_turn(
         "What should happen next?"
     )
 
+    dynamic_system_prompt = SYSTEM_PROMPT
+    if mode == "basic":
+        dynamic_system_prompt = SYSTEM_PROMPT.replace("Stop at 5 questions maximum.", "Stop at 3 questions maximum.")
+        dynamic_system_prompt = dynamic_system_prompt.replace("after 3-5 questions", "after 1-3 questions")
+    elif mode == "skip":
+        dynamic_system_prompt = SYSTEM_PROMPT.replace(
+            "Ask ONE question per turn. Never two.",
+            "DO NOT ASK ANY QUESTIONS. Immediately assemble the prompt and return done: true."
+        ).replace("after 3-5 questions", "IMMEDIATELY (0 questions)")
+
     config = types.GenerateContentConfig(
-        system_instruction=SYSTEM_PROMPT,
+        system_instruction=dynamic_system_prompt,
         temperature=0.2,
     )
 
