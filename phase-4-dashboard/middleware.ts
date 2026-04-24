@@ -23,6 +23,19 @@ export async function middleware(request: NextRequest) {
     supabaseAnonKey,
     {
       cookies: {
+        get(name: string) {
+          return request.cookies.get(name)?.value;
+        },
+        set(name: string, value: string, options: any) {
+          request.cookies.set(name, value);
+          supabaseResponse = NextResponse.next({ request });
+          supabaseResponse.cookies.set(name, value, options);
+        },
+        remove(name: string, options: any) {
+          request.cookies.delete(name);
+          supabaseResponse = NextResponse.next({ request });
+          supabaseResponse.cookies.delete(name);
+        },
         getAll: () => request.cookies.getAll(),
         setAll: (cookiesToSet: any[]) => {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
@@ -35,19 +48,24 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  const { data: { user }, error } = await supabase.auth.getUser();
+  const { data: { session }, error } = await supabase.auth.getSession();
+  const user = session?.user;
 
+  console.log('\n=============================================');
+  console.log('>>> MIDDLEWARE HIT');
   console.log('Middleware Path:', request.nextUrl.pathname);
-  console.log('Cookies present:', request.cookies.getAll().map(c => c.name));
-  console.log('User found in middleware:', !!user);
+  console.log('Incoming Request Cookies:', request.cookies.getAll().map(c => c.name));
+  console.log('Session found in middleware:', !!session);
+  
   if (error) {
     console.error('Middleware Auth Error:', error.message);
   }
+  console.log('=============================================\n');
 
   // Protect all /dashboard routes
-  if (!user && request.nextUrl.pathname.startsWith('/dashboard')) {
-    console.log('Redirecting to /login because no user - DISABLED FOR STABILITY');
-    // return NextResponse.redirect(new URL('/login', request.url));
+  if (!session && request.nextUrl.pathname.startsWith('/dashboard')) {
+    console.log('Redirecting to /login because no user');
+    return NextResponse.redirect(new URL('/login', request.url));
   }
 
   return supabaseResponse;

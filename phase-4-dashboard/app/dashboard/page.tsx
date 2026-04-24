@@ -16,13 +16,19 @@ export default async function DashboardPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+        set() {},
+        remove() {},
         getAll: () => cookieStore.getAll(),
         setAll: () => {},
       },
     }
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { session } } = await supabase.auth.getSession();
+  const user = session?.user;
 
   // If there's an auth cookie parsing error due to localhost environments,
   // we fallback to the seeded dummy user UUID so the UI is visible for development.

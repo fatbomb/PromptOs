@@ -25,7 +25,10 @@ function LoginForm() {
   useEffect(() => {
     // Check if user is already logged in
     const checkSession = async () => {
+      console.log('>>> CLIENT CHECK SESSION HIT');
       const { data: { session } } = await supabase.auth.getSession();
+      console.log('Client getSession returned session:', !!session);
+      
       if (session) {
         if (state) {
           // Hand off token to CLI
