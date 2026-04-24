@@ -196,6 +196,14 @@ function LoginForm() {
         </button>
       </div>
 
+      {!isSignUp && (
+        <div className="text-right -mt-2">
+          <a href="/forgot-password" className="text-xs text-blue-500 hover:text-blue-400 transition-colors font-medium">
+            Forgot password?
+          </a>
+        </div>
+      )}
+
       {isSignUp && (
         <div className="relative group animate-fade-in-up">
           <input
