@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import MetricCard from '@/components/MetricCard';
+import AISelfAwarenessCard from '@/components/AISelfAwarenessCard';
 import SessionTable from '@/components/SessionTable';
 import WeeklyTrendChart from '@/components/WeeklyTrendChart';
 import ExtensionSync from '@/components/ExtensionSync';
@@ -88,7 +89,10 @@ export default async function DashboardPage() {
         {/* Metric cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           <div className="animate-fade-in-up delay-100">
-            <MetricCard label="Sessions this month" value={totalSessions} unit="" variant="blue" icon="M13 10V3L4 14h7v7l9-11h-7z" />
+            <AISelfAwarenessCard 
+              score={sessions?.[0]?.ai_self_awareness_score ?? 0} 
+              sessionId={sessions?.[0]?.id} 
+            />
           </div>
           <div className="animate-fade-in-up delay-200">
             <MetricCard label="Expected Turns Saved" value={latestSavings?.estimated_turns_saved ?? 0} unit="" variant="indigo" icon="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />

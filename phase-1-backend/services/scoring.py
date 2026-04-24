@@ -19,15 +19,19 @@ def _count_tokens(text: str) -> int:
     return len(_encoder.encode(text))
 
 
-def compute_scores(
+async def compute_scores(
     raw_prompt: str,
     assembled_prompt: str,
     conversation_history: list[dict],
+    was_refused: bool = False,
 ) -> dict:
     """
     Task 1.5 — Returns token_efficiency, thinking_depth, dependency_score,
     and estimated_turns_saved.
+    Also computes ai_self_awareness_score (Phase 1 update).
     """
+    from services.gemini import rate_specificity
+
     raw_tokens = _count_tokens(raw_prompt)
     assembled_tokens = _count_tokens(assembled_prompt)
 
@@ -53,6 +57,17 @@ def compute_scores(
     #    Formula from implementation plan: 6 - floor(thinking_depth / 20)
     estimated_turns_saved = max(0, 6 - (thinking_depth // 20))
 
+    # 5. AI Self-Awareness Score
+    specificity_score = await rate_specificity(assembled_prompt)
+    # Refusal NOT triggered penalty: if it WAS refused (they knew answer), they get 0 penalty points
+    # Wait, the prompt says "refusal_not_triggered_penalty". So if refusal NOT triggered, they get points?
+    # Or if refusal triggered, they lose points?
+    # Actually, if refusal IS triggered, they already knew the answer. Asking AI means LOW self awareness.
+    # So if they did NOT trigger refusal, they get 20 points.
+    refusal_points = 0 if was_refused else 20
+    ai_self_awareness_score = int((thinking_depth * 0.4) + (specificity_score * 0.4) + refusal_points)
+    ai_self_awareness_score = min(100, max(0, ai_self_awareness_score))
+
     return {
         "raw_token_count": raw_tokens,
         "assembled_token_count": assembled_tokens,
@@ -60,4 +75,6 @@ def compute_scores(
         "thinking_depth_score": thinking_depth,
         "dependency_score": dependency_score,
         "estimated_turns_saved": estimated_turns_saved,
+        "specificity_score": specificity_score,
+        "ai_self_awareness_score": ai_self_awareness_score,
     }

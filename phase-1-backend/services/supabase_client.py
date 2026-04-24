@@ -21,6 +21,7 @@ def store_session_db(session_data: dict):
             "thinking_depth_score": session_data["scores"].get("thinking_depth", 0),
             "dependency_score": session_data["scores"].get("dependency_score", 50),
             "estimated_turns_saved": session_data["scores"].get("estimated_turns_saved", 0),
+            "ai_self_awareness_score": session_data["scores"].get("ai_self_awareness_score", 0),
             "was_refused": session_data.get("was_refused", False),
             "source": session_data.get("source", "cli"),
         }

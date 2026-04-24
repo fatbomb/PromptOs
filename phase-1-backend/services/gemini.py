@@ -333,3 +333,45 @@ async def check_refusal(hypothesis: str) -> dict:
     if result.get("should_refuse"):
         result["message"] = "You already know the answer. Try implementing it."
     return result
+
+
+async def rate_specificity(assembled_prompt: str) -> int:
+    """
+    Rates the specificity and actionability of an assembled prompt on a 0-100 scale.
+    """
+    RATING_PROMPT = """You are an expert prompt evaluator.
+Your job is to rate how specific, complete, and actionable the following assembled prompt is on a scale of 0 to 100.
+A score of 100 means the prompt has perfect context, clear reproduction steps, and unambiguous constraints.
+A score of 0 means the prompt is completely vague and unhelpful.
+
+Output ONLY a raw integer between 0 and 100. Do not output anything else.
+"""
+    config = types.GenerateContentConfig(
+        system_instruction=RATING_PROMPT,
+        temperature=0.1,
+    )
+
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = await get_client().aio.models.generate_content(
+                model="gemini-2.5-flash-lite",
+                contents=f"Assembled Prompt to rate:\n\n{assembled_prompt}",
+                config=config,
+            )
+            break
+        except ServerError as e:
+            if attempt < max_retries - 1 and "503" in str(e):
+                import asyncio
+                delay = (2 ** attempt) + 2
+                print(f"  [Gemini] 503 high demand — retrying rating in {delay}s... (Attempt {attempt+1}/{max_retries})")
+                await asyncio.sleep(delay)
+            else:
+                raise e
+
+    try:
+        score = int(response.text.strip())
+        return min(100, max(0, score))
+    except (ValueError, AttributeError):
+        return 50 # Fallback score
+

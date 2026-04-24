@@ -92,10 +92,11 @@ async def send_message(req: MessageRequest, user=Depends(get_current_user)):
 
     if gemini_response.get("done"):
         # Compute scores (Task 1.5)
-        scores = compute_scores(
+        scores = await compute_scores(
             raw_prompt=session["raw_prompt"],
             assembled_prompt=gemini_response["assembled_prompt"],
             conversation_history=session["conversation_history"],
+            was_refused=gemini_response.get("should_refuse", False),
         )
         session["assembled_prompt"] = gemini_response["assembled_prompt"]
         session["scores"] = scores
