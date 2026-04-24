@@ -31,7 +31,7 @@ export default async function DecayPage() {
       {/* Background Orbs */}
       <div className="absolute top-[-10%] right-[-5%] w-[400px] h-[400px] rounded-full bg-amber-600/10 blur-[120px] pointer-events-none"></div>
       
-      <div className="max-w-7xl mx-auto relative z-10 animate-fade-in-up">
+      <div className="max-w-7xl mx-auto relative z-10">
         <header className="mb-12">
           <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-3">
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-orange-400 to-red-400">
@@ -44,7 +44,7 @@ export default async function DecayPage() {
         </header>
 
         {decayData && decayData.length > 0 ? (
-          <div>
+          <div className="animate-fade-in-up">
             <SkillDecayChart data={decayData} />
             
             <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">

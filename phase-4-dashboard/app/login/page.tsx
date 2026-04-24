@@ -225,7 +225,7 @@ function LoginForm() {
       <button
         type="submit"
         disabled={loading}
-        className="group relative w-full flex justify-center py-3.5 px-4 border border-transparent text-sm font-bold rounded-xl text-white bg-gradient-to-r from-blue-600 via-purple-600 to-blue-600 animate-gradient-x focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:ring-offset-gray-900 disabled:opacity-50 transition-all overflow-hidden shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_30px_rgba(168,85,247,0.5)]"
+        className="group relative w-full flex justify-center py-3.5 px-4 rounded-xl text-[var(--text-primary)] hover:text-white bg-[var(--glass-card-bg)] hover:bg-gradient-to-r hover:from-indigo-500 hover:via-purple-500 hover:to-blue-500 font-bold tracking-widest uppercase text-sm border border-[var(--glass-border)] hover:border-transparent transition-all duration-200 ease-out overflow-hidden shadow-sm hover:shadow-[0_8px_30px_rgba(99,102,241,0.4)] hover:animate-gradient-x active:scale-[0.97] active:shadow-inner disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:ring-offset-[var(--bg-color)]"
       >
         {loading ? (
           <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
