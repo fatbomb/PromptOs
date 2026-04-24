@@ -25,6 +25,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: 'Knowledge Map', href: '/dashboard/knowledge' },
     { name: 'Skill Decay', href: '/dashboard/decay' },
     { name: 'Team', href: '/dashboard/team' },
+    { name: 'Quiz', href: '/dashboard/quiz' },
   ];
 
   return (

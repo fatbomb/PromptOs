@@ -8,9 +8,11 @@ Wraps Google Gemini Flash 2.5 for:
 
 import os
 import json
+import asyncio
 
 from google import genai
 from google.genai import types
+from google.genai.errors import ServerError
 
 # Lazy-initialize the client to ensure environment variables are loaded first.
 _client_instance = None
@@ -199,11 +201,25 @@ async def run_conversation_turn(
         temperature=0.2,
     )
 
-    response = await get_client().aio.models.generate_content(
-        model="gemini-2.5-flash-lite",
-        contents=user_message,
-        config=config,
-    )
+    # -----------------------------------------------------------------------
+    # Call Gemini with retry mechanism
+    # -----------------------------------------------------------------------
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = await get_client().aio.models.generate_content(
+                model="gemini-2.5-flash-lite",
+                contents=user_message,
+                config=config,
+            )
+            break
+        except ServerError as e:
+            if attempt < max_retries - 1 and "503" in str(e):
+                delay = (2 ** attempt) + 2
+                print(f"  [Gemini] 503 high demand — retrying in {delay}s... (Attempt {attempt+1}/{max_retries})")
+                await asyncio.sleep(delay)
+            else:
+                raise e
 
     try:
         return _extract_json(response.text)
@@ -221,11 +237,22 @@ async def check_refusal(hypothesis: str) -> dict:
         temperature=0.1,
     )
 
-    response = await get_client().aio.models.generate_content(
-        model="gemini-2.5-flash-lite",
-        contents=f"Developer hypothesis: {hypothesis}",
-        config=config,
-    )
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = await get_client().aio.models.generate_content(
+                model="gemini-2.5-flash-lite",
+                contents=f"Developer hypothesis: {hypothesis}",
+                config=config,
+            )
+            break
+        except ServerError as e:
+            if attempt < max_retries - 1 and "503" in str(e):
+                delay = (2 ** attempt) + 2
+                print(f"  [Gemini] 503 high demand — retrying in {delay}s... (Attempt {attempt+1}/{max_retries})")
+                await asyncio.sleep(delay)
+            else:
+                raise e
 
     try:
         result = _extract_json(response.text)
