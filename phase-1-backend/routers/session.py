@@ -8,7 +8,7 @@ Endpoints:
 """
 
 import uuid
-from fastapi import APIRouter, Depends, BackgroundTasks
+from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
 from middleware.jwt_verify import get_current_user
@@ -70,8 +70,8 @@ async def send_message(req: MessageRequest, user=Depends(get_current_user)):
     """
     session = _sessions.get(req.session_id)
     if not session:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Session not found")
+
 
     # Append user turn
     session["conversation_history"].append({"role": "user", "content": req.user_message})
@@ -122,8 +122,8 @@ async def complete_session(
     """
     session = _sessions.get(req.session_id)
     if not session:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Session not found")
+
 
     # TODO (Task 3.2): persist session row to Supabase `sessions` table
 

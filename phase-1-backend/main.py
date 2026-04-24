@@ -10,9 +10,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-from routers import session, refusal, tokens, auth
-
 load_dotenv()
+
+from routers import session, refusal, tokens, auth
 
 app = FastAPI(title="PromptOS API", version="1.0.0")
 
