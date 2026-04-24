@@ -224,14 +224,22 @@ export default function App() {
   const [refuseMsg, setRefuseMsg] = useState('');
   const [copied, setCopied]       = useState(false);
 
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef    = useRef<HTMLInputElement>(null);
+  const sessionRef  = useRef<string | null>(null);
+  const turnRef     = useRef<number>(1);
 
+  // Keep refs in sync so the message handler always sees latest values
+  useEffect(() => { sessionRef.current = sessionId; }, [sessionId]);
+  useEffect(() => { turnRef.current = turnNum; }, [turnNum]);
+
+  // Single stable message handler — no dependency array issues
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       const msg = event.data;
       switch (msg.type) {
         case 'sessionStarted':
           setSessionId(msg.sessionId);
+          sessionRef.current = msg.sessionId;
           setPhase('loading');
           vscode?.postMessage({ type: 'sendMessage', sessionId: msg.sessionId, userMessage: '_init_' });
           break;
@@ -244,11 +252,11 @@ export default function App() {
               setAssembled(msg.assembled_prompt);
               setScores(msg.scores);
               setPhase('complete');
-              vscode?.postMessage({ type: 'completeSession', sessionId });
+              vscode?.postMessage({ type: 'completeSession', sessionId: sessionRef.current });
             }
           } else {
             setQuestion(msg.question);
-            setTurnNum(msg.turn ?? turnNum + 1);
+            setTurnNum((msg.turn as number) ?? (turnRef.current + 1));
             setPhase('asking');
             setTimeout(() => inputRef.current?.focus(), 80);
           }
@@ -257,7 +265,7 @@ export default function App() {
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, [sessionId, turnNum]);
+  }, []); // empty — handler is stable via refs
 
   const handleStart = () => {
     if (!rawPrompt.trim()) return;
@@ -266,10 +274,11 @@ export default function App() {
   };
 
   const handleAnswer = () => {
-    if (!answer.trim() || !sessionId) return;
-    setPhase('loading');
-    vscode?.postMessage({ type: 'sendMessage', sessionId, userMessage: answer.trim() });
+    if (!answer.trim() || !sessionRef.current) return;
+    const currentAnswer = answer.trim();
     setAnswer('');
+    setPhase('loading');
+    vscode?.postMessage({ type: 'sendMessage', sessionId: sessionRef.current, userMessage: currentAnswer });
   };
 
   const handleSendToTerminal = () => {
