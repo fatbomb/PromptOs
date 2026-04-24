@@ -15,6 +15,14 @@ export class PromptosSidebarProvider implements vscode.WebviewViewProvider {
   private _api: ApiClient;
   private _apiBase: string;
   private _dashboardBase: string;
+  // Track session data for direct Supabase write
+  private _sessionData: Map<string, {
+    rawPrompt: string;
+    assembledPrompt?: string;
+    conversationHistory: Array<{ role: string; content: string }>;
+    scores?: Record<string, number>;
+    wasRefused?: boolean;
+  }> = new Map();
 
   constructor(private readonly _context: vscode.ExtensionContext) {
     this._apiBase = vscode.workspace
@@ -83,6 +91,11 @@ export class PromptosSidebarProvider implements vscode.WebviewViewProvider {
         case 'startSession': {
           try {
             const result = await this._api.startSession(msg.rawPrompt, msg.workspaceContext);
+            // Track session data for direct Supabase write
+            this._sessionData.set(result.session_id, {
+              rawPrompt: msg.rawPrompt,
+              conversationHistory: [],
+            });
             webviewView.webview.postMessage({ type: 'sessionStarted', sessionId: result.session_id });
           } catch (e: unknown) {
             if ((e as Error).message === 'UNAUTHORIZED') {
@@ -98,6 +111,21 @@ export class PromptosSidebarProvider implements vscode.WebviewViewProvider {
         case 'sendMessage': {
           try {
             const result = await this._api.sendMessage(msg.sessionId, msg.userMessage);
+            // Track conversation history
+            const sd = this._sessionData.get(msg.sessionId);
+            if (sd) {
+              sd.conversationHistory.push({ role: 'user', content: msg.userMessage });
+              if (result.done && !result.should_refuse) {
+                sd.assembledPrompt = result.assembled_prompt as string;
+                sd.scores = result.scores as Record<string, number>;
+              }
+              if (result.done && result.should_refuse) {
+                sd.wasRefused = true;
+              }
+              if (!result.done && result.question) {
+                sd.conversationHistory.push({ role: 'assistant', content: result.question as string });
+              }
+            }
             webviewView.webview.postMessage({ type: 'messageResponse', ...result });
           } catch (e: unknown) {
             if ((e as Error).message === 'UNAUTHORIZED') {
@@ -111,7 +139,34 @@ export class PromptosSidebarProvider implements vscode.WebviewViewProvider {
         }
 
         case 'completeSession': {
+          // 1. Tell backend to complete (triggers its own Supabase write + concept extraction)
           await this._api.completeSession(msg.sessionId);
+
+          // 2. Also write directly to Supabase so dashboard updates immediately
+          const sd = this._sessionData.get(msg.sessionId);
+          if (sd?.assembledPrompt && sd.scores) {
+            await this._api.writeSessionToSupabase({
+              rawPrompt:           sd.rawPrompt,
+              assembledPrompt:     sd.assembledPrompt,
+              conversationHistory: sd.conversationHistory,
+              scores: {
+                token_efficiency_score: sd.scores.token_efficiency_score ?? 0,
+                thinking_depth_score:   sd.scores.thinking_depth_score   ?? 0,
+                dependency_score:       sd.scores.dependency_score        ?? 0,
+                estimated_turns_saved:  sd.scores.estimated_turns_saved   ?? 0,
+                ai_self_awareness_score: sd.scores.ai_self_awareness_score,
+              },
+              wasRefused: sd.wasRefused ?? false,
+            });
+            await this._api.updateWeeklyAggregates({
+              token_efficiency_score: sd.scores.token_efficiency_score ?? 0,
+              thinking_depth_score:   sd.scores.thinking_depth_score   ?? 0,
+              dependency_score:       sd.scores.dependency_score        ?? 0,
+              estimated_turns_saved:  sd.scores.estimated_turns_saved   ?? 0,
+            });
+          }
+          this._sessionData.delete(msg.sessionId);
+
           const summary = await this._api.getTokenSummary();
           webviewView.webview.postMessage({ type: 'sessionComplete', summary });
           break;
