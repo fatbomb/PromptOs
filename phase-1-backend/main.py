@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from routers import session, refusal, tokens, auth
+from routers import session, refusal, tokens, auth, quiz
 
 app = FastAPI(title="PromptOS API", version="1.0.0")
 
@@ -34,6 +34,7 @@ app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(session.router, prefix="/session", tags=["session"])
 app.include_router(refusal.router, prefix="/refusal", tags=["refusal"])
 app.include_router(tokens.router, prefix="/tokens", tags=["tokens"])
+app.include_router(quiz.router, tags=["quiz"])
 
 
 # ---------------------------------------------------------------------------

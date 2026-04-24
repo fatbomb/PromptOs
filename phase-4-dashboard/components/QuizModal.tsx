@@ -1,36 +1,81 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+
+interface Question {
+  q: string;
+  options: string[];
+  correct_index: number;
+}
 
 interface Props {
   concept: string;
   onClose: () => void;
 }
 
-const mockQuestions = [
-  { q: "Which HTTP status code typically indicates 'Unauthorized'?", options: ["400", "401", "403", "500"], ans: 1 },
-  { q: "What is the primary purpose of a JWT?", options: ["Database caching", "Session tracking via stateful database entries", "Stateless authentication", "Encrypting files"], ans: 2 },
-  { q: "Row Level Security (RLS) in Supabase is built on top of what technology?", options: ["Node.js Middleware", "Postgres native policies", "Redis ACLs", "Next.js Edge Functions"], ans: 1 },
-];
-
 export default function QuizModal({ concept, onClose }: Props) {
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [loading, setLoading] = useState(true);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [score, setScore] = useState(0);
   const [finished, setFinished] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
 
+  useEffect(() => {
+    async function loadQuiz() {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'}/quiz/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ concept }),
+        });
+        const data = await res.json();
+        if (data.questions) {
+          setQuestions(data.questions);
+        }
+      } catch (err) {
+        console.error('Failed to load quiz:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadQuiz();
+  }, [concept]);
+
   const handleNext = () => {
-    if (selected === mockQuestions[currentIdx].ans) {
+    if (selected === questions[currentIdx].correct_index) {
       setScore(score + 1);
     }
     
-    if (currentIdx < mockQuestions.length - 1) {
+    if (currentIdx < questions.length - 1) {
       setCurrentIdx(currentIdx + 1);
       setSelected(null);
     } else {
       setFinished(true);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in-up">
+        <div className="glass-panel w-full max-w-lg rounded-3xl p-8 relative shadow-2xl border border-white/10 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-[var(--text-secondary)]">Generating AI Remediation Quiz...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (questions.length === 0) {
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in-up">
+        <div className="glass-panel w-full max-w-lg rounded-3xl p-8 relative shadow-2xl border border-white/10 text-center">
+          <p className="text-red-500 mb-4">Failed to generate quiz for this concept.</p>
+          <button onClick={onClose} className="px-6 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold transition-all">Close</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in-up">
@@ -45,14 +90,14 @@ export default function QuizModal({ concept, onClose }: Props) {
             <div className="mb-6">
               <span className="text-xs font-bold text-amber-500 uppercase tracking-widest border border-amber-500/30 bg-amber-500/10 px-3 py-1 rounded-full mb-4 inline-block">Remediation Module Active</span>
               <h2 className="text-2xl font-bold text-[var(--text-primary)] mt-2">Knowledge Quiz: {concept}</h2>
-              <p className="text-sm text-[var(--text-secondary)] mt-1">Question {currentIdx + 1} of {mockQuestions.length}</p>
+              <p className="text-sm text-[var(--text-secondary)] mt-1">Question {currentIdx + 1} of {questions.length}</p>
             </div>
 
             <div className="mb-8">
-              <p className="text-lg font-medium text-[var(--text-primary)] mb-6">{mockQuestions[currentIdx].q}</p>
+              <p className="text-lg font-medium text-[var(--text-primary)] mb-6">{questions[currentIdx].q}</p>
               
               <div className="space-y-3">
-                {mockQuestions[currentIdx].options.map((opt, i) => (
+                {questions[currentIdx].options.map((opt, i) => (
                   <button
                     key={i}
                     onClick={() => setSelected(i)}
@@ -73,7 +118,7 @@ export default function QuizModal({ concept, onClose }: Props) {
               disabled={selected === null}
               className="w-full py-4 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold hover:shadow-[0_0_20px_rgba(168,85,247,0.4)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {currentIdx === mockQuestions.length - 1 ? 'Submit Answers' : 'Next Question'}
+              {currentIdx === questions.length - 1 ? 'Submit Answers' : 'Next Question'}
             </button>
           </div>
         ) : (
@@ -82,7 +127,7 @@ export default function QuizModal({ concept, onClose }: Props) {
                <svg className="w-10 h-10 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
             </div>
             <h2 className="text-3xl font-extrabold text-white mb-2">Module Complete</h2>
-            <p className="text-gray-400 mb-8">You scored {score}/{mockQuestions.length} on the {concept} concept test.</p>
+            <p className="text-gray-400 mb-8">You scored {score}/{questions.length} on the {concept} concept test.</p>
             <button onClick={onClose} className="px-8 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold transition-all border border-white/10">Return to Dashboard</button>
           </div>
         )}
