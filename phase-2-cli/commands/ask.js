@@ -11,17 +11,13 @@
 import inquirer from 'inquirer';
 import ora from 'ora';
 import chalk from 'chalk';
-import { getToken } from '../utils/auth.js';
+import { ensureAuth } from '../utils/ensure-auth.js';
 import { printReceipt } from '../utils/receipt.js';
 
 const API = process.env.PROMPTOS_API_BASE_URL || 'http://localhost:8000';
 
 export async function askCommand(rawPrompt, options) {
-  const token = await getToken();
-  if (!token) {
-    console.log(chalk.red('Not logged in. Run: promptos login'));
-    process.exit(1);
-  }
+  const token = await ensureAuth();
 
   let mode = 'default';
   if (options.skip) mode = 'skip';
@@ -56,11 +52,19 @@ export async function askCommand(rawPrompt, options) {
 
   // Step 2: Question loop
   while (!done) {
-    const msgRes = await fetch(`${API}/session/message`, {
+    const response = await fetch(`${API}/session/message`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ session_id, user_message: '_start_' }),
-    }).then((r) => r.json());
+      body: JSON.stringify({ session_id, user_message: turn === 1 ? '_start_' : '_continue_' }),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
+      console.log(chalk.red(`\n❌ Error from PromptOS: ${err.detail || response.statusText}`));
+      return;
+    }
+
+    const msgRes = await response.json();
 
     if (msgRes.done) {
       done = true;

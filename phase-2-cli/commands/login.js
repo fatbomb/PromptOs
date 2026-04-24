@@ -22,10 +22,10 @@ export async function loginCommand() {
   console.log(chalk.cyan('\n🔑 Opening browser for Google login...\n'));
   await open(loginUrl);
 
-  const spinner = ora('Waiting for authentication (60s timeout)...').start();
+  const spinner = ora('Waiting for authentication (300s timeout)...').start();
 
-  // Poll every 2 seconds for up to 60 seconds
-  for (let i = 0; i < 30; i++) {
+  // Poll every 2 seconds for up to 300 seconds (150 iterations)
+  for (let i = 0; i < 150; i++) {
     await _sleep(2000);
     try {
       const res = await fetch(`${API}/auth/cli-token?state=${state}`);

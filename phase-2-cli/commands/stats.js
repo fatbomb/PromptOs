@@ -5,16 +5,12 @@
  */
 
 import chalk from 'chalk';
-import { getToken } from '../utils/auth.js';
+import { ensureAuth } from '../utils/ensure-auth.js';
 
 const API = process.env.PROMPTOS_API_BASE_URL || 'http://localhost:8000';
 
 export async function statsCommand() {
-  const token = await getToken();
-  if (!token) {
-    console.log(chalk.red('Not logged in. Run: promptos login'));
-    process.exit(1);
-  }
+  const token = await ensureAuth();
 
   const summary = await fetch(`${API}/tokens/summary`, {
     headers: { Authorization: `Bearer ${token}` },

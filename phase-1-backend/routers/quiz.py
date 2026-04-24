@@ -26,7 +26,7 @@ Do not include markdown or code fences."""
 async def generate_quiz(request: QuizRequest):
     try:
         response = await get_client().aio.models.generate_content(
-            model="gemini-2.5-flash-lite",
+            model="gemini-1.5-flash",
             contents=QUIZ_PROMPT.format(concept=request.concept),
         )
         
