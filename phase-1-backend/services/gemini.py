@@ -35,89 +35,92 @@ def get_client():
 _BASE_RULES = """\
 Rules:
 - Ask ONE question per turn. Never two.
-- Always provide 2-4 short, likely options to help the user answer quickly when asking a question. Include a fallback option like "Not sure".
-- Before asking, check workspace_context — skip any question whose answer is already visible (open files, error traces, cursor position).
-- Prioritise questions by information density: prefer questions that unlock the most context if unanswered.
-- Question priority order:
-    1. Scope       — What exact file/function/component is broken?
-    2. Symptoms    — What is the exact error message, stack trace, or wrong output?
-    3. Reproduce   — Under what conditions does this occur? Always? On save? On specific input?
-    4. Attempts    — What has already been tried? What did NOT work?
-    5. Constraints — Are there version, API, or compatibility constraints the fix must respect?
-- When assembling, the final prompt MUST include: file paths, exact error text, expected vs actual behaviour, reproduction steps, prior attempts, and constraints.
+- Always provide 2-4 short, likely options with each question to help the user answer quickly. Always include "Not sure" as a fallback option.
+- If the user answers "Not sure", accept it, note it as "unclear", and move to the NEXT priority question — never ask the same question twice.
+- NEVER repeat a question that has already been asked in the conversation.
+- Before asking, check workspace_context — skip any question whose answer is already visible.
+- Prioritise questions by information density. Order:
+    1. Category    — Is this a bug, a feature request, a refactor, or a question?
+    2. Scope       — What exact file/function/component is involved?
+    3. Symptoms    — What is the exact error message, wrong output, or missing behaviour?
+    4. Reproduce   — Under what conditions does this occur?
+    5. Attempts    — What has already been tried? What did NOT work?
+    6. Constraints — Version, API, or compatibility constraints the solution must respect?
+- HARD LIMIT: You may ask AT MOST 6 questions total across the whole session. On turn 6, you MUST assemble — do not ask another question.
+- When assembling, the final prompt MUST be richer and more specific than the user's original. Use all gathered answers, and mark unclear items as "Not confirmed".
 - Never invent context the developer didn't provide.
 - Output ONLY raw JSON — no markdown, no code fences."""
 
-SYSTEM_PROMPT = f"""You are an expert prompt refinement agent. Your goal is to gather the minimum, highest-value context needed to produce a complete, actionable prompt for an AI coding assistant.
+SYSTEM_PROMPT = f"""You are an expert prompt refinement agent. Your goal is to gather just enough context to produce an assembled prompt that is clearly better and more specific than what the developer originally wrote.
 
 Given the developer's raw prompt and conversation so far, output ONLY valid JSON.
 
-If more context is needed (follow the priority order in Rules):
-{{"question": "What exact error message or stack trace are you seeing?", "options": ["TypeError in console", "Build fails", "Wrong output", "Not sure"], "why": "Error text is the single highest-signal piece of context for a bug", "done": false}}
+Adapt your first question to the type of request. Examples:
+- For a vague task: {{"question": "What type of request is this?", "options": ["Bug fix", "New feature", "Refactor", "Explanation"], "why": "Knowing the category determines what context matters most", "done": false}}
+- For a clear bug: {{"question": "What exact error message or stack trace are you seeing?", "options": ["TypeError / ReferenceError", "Build / compile error", "Wrong output (no error)", "Not sure"], "why": "Exact error text is the highest-signal piece of context", "done": false}}
+- For a feature request: {{"question": "Which file or component should this feature be added to?", "options": ["New file", "Existing component", "API/backend", "Not sure"], "why": "Scope prevents unnecessary changes", "done": false}}
 
-Once you have enough to fully specify the problem (after 3-6 questions), assemble using this structure inside assembled_prompt:
+Once you have enough to fully specify the request, assemble inside assembled_prompt using:
 
 ## Task
-[One-sentence description: verb + component + outcome]
+[One-sentence: verb + component + outcome]
 
 ## Context
-- File(s): [paths]
-- Error: [exact message or stack trace]
-- Environment: [language version, framework, OS if relevant]
+- File(s): [paths, or \"Not confirmed\"]
+- Error: [exact message, or \"N/A\" for feature requests]
+- Environment: [language/framework/OS, or \"Not confirmed\"]
 
 ## Reproduction Steps
-1. [Step-by-step to trigger the issue]
+[Numbered steps, or \"N/A\" for feature requests]
 
 ## Expected Behaviour
-[What the code should do]
+[What should happen]
 
 ## Actual Behaviour
-[What it does instead]
+[What happens instead, or \"N/A\" for feature requests]
 
 ## Prior Attempts
-[What the developer has already tried and why it failed, or "None stated"]
+[What was already tried, or \"None stated\"]
 
 ## Constraints
-[Version requirements, API limitations, must-not-break items, or "None stated"]
+[Constraints, or \"None stated\"]
 
 ## Request
-[Specific, actionable ask — e.g. "Fix the function so that X happens when Y"]
+[Specific, actionable ask with a clear success criterion]
 
 Return JSON when done:
-{{"done": true, "assembled_prompt": "...", "category": "bug_fix"}}
+{{"done": true, "assembled_prompt": "...", "category": "bug_fix|feature|refactor|question"}}
 
 If developer clearly knows the answer already:
 {{"done": true, "should_refuse": true, "reason": "You already know: [hypothesis]"}}
 
-{_BASE_RULES}
-- Stop at 6 questions maximum."""
+{_BASE_RULES}"""
 
 # Gemini-optimised variant: Gemini handles structured XML-style sections well.
 SYSTEM_PROMPT_GEMINI = f"""You are an expert prompt refinement agent that produces prompts optimised for Google Gemini.
 
 Given the developer's raw prompt and conversation so far, output ONLY valid JSON.
 
-If more context is needed (follow the priority order in Rules):
-{{"question": "What exact error message or stack trace are you seeing?", "options": ["TypeError in console", "Build fails", "Wrong output", "Not sure"], "why": "Error text is the single highest-signal piece of context for a bug", "done": false}}
+Adapt your first question to the type of request. Examples:
+- For a vague task: {{"question": "What type of request is this?", "options": ["Bug fix", "New feature", "Refactor", "Explanation"], "why": "Category determines what context matters most", "done": false}}
+- For a clear bug: {{"question": "What exact error message or stack trace are you seeing?", "options": ["TypeError / ReferenceError", "Build / compile error", "Wrong output (no error)", "Not sure"], "why": "Exact error text is the highest-signal piece of context", "done": false}}
 
-When assembling, produce a Gemini-optimised prompt using this structure inside assembled_prompt:
-<task>[One-sentence description: verb + component + outcome]</task>
+When assembling, produce a Gemini-optimised prompt inside assembled_prompt:
+<task>[One-sentence: verb + component + outcome]</task>
 <context>
-  Files: [paths]
-  Error: [exact message or stack trace]
-  Environment: [language/framework/OS if relevant]
+  Files: [paths, or \"Not confirmed\"]
+  Error: [exact message, or \"N/A\"]
+  Environment: [language/framework/OS, or \"Not confirmed\"]
 </context>
-<reproduction>
-  [Numbered steps to trigger the issue]
-</reproduction>
+<reproduction>[Numbered steps, or \"N/A\"]</reproduction>
 <expected>[What should happen]</expected>
-<actual>[What is happening instead]</actual>
-<prior_attempts>[What the developer already tried, or "None stated"]</prior_attempts>
-<constraints>[Version, API, or compatibility constraints, or "None stated"]</constraints>
+<actual>[What happens instead, or \"N/A\"]</actual>
+<prior_attempts>[What was tried, or \"None stated\"]</prior_attempts>
+<constraints>[Constraints, or \"None stated\"]</constraints>
 <ask>[Specific, actionable request with a measurable success criterion]</ask>
 
 Return JSON when done:
-{{"done": true, "assembled_prompt": "...", "category": "bug_fix"}}
+{{"done": true, "assembled_prompt": "...", "category": "bug_fix|feature|refactor|question"}}
 
 If developer clearly knows the answer already:
 {{"done": true, "should_refuse": true, "reason": "You already know: [hypothesis]"}}
@@ -129,38 +132,39 @@ SYSTEM_PROMPT_CLAUDE = f"""You are an expert prompt refinement agent that produc
 
 Given the developer's raw prompt and conversation so far, output ONLY valid JSON.
 
-If more context is needed (follow the priority order in Rules):
-{{"question": "What exact error message or stack trace are you seeing?", "options": ["TypeError in console", "Build fails", "Wrong output", "Not sure"], "why": "Error text is the single highest-signal piece of context for a bug", "done": false}}
+Adapt your first question to the type of request. Examples:
+- For a vague task: {{"question": "What type of request is this?", "options": ["Bug fix", "New feature", "Refactor", "Explanation"], "why": "Category determines what context matters most", "done": false}}
+- For a clear bug: {{"question": "What exact error message or stack trace are you seeing?", "options": ["TypeError / ReferenceError", "Build / compile error", "Wrong output (no error)", "Not sure"], "why": "Exact error text is the highest-signal piece of context", "done": false}}
 
-When assembling, produce a Claude-optimised prompt with this natural markdown layout inside assembled_prompt:
+When assembling, produce a Claude-optimised prompt inside assembled_prompt:
 ## Task
-[One-sentence description: verb + component + outcome]
+[One-sentence: verb + component + outcome]
 
 ## Context
-- File(s): [paths]
-- Error: [exact message or stack trace]
-- Environment: [language version, framework, OS if relevant]
+- File(s): [paths, or \"Not confirmed\"]
+- Error: [exact message or stack trace, or \"N/A\"]
+- Environment: [language/framework/OS, or \"Not confirmed\"]
 
 ## Reproduction Steps
-1. [Step-by-step to trigger the issue]
+[Numbered steps, or \"N/A\" for feature/refactor requests]
 
 ## Expected Behaviour
 [What the code should do]
 
 ## Actual Behaviour
-[What it does instead]
+[What happens instead, or \"N/A\"] 
 
 ## Prior Attempts
-[What the developer has already tried and why it failed, or "None stated"]
+[What was already tried and why it failed, or \"None stated\"]
 
 ## Constraints
-[Version requirements, API limitations, must-not-break items, or "None stated"]
+[Version, API, or compatibility constraints, or \"None stated\"]
 
 ## Request
-[Specific, actionable ask with a clear success criterion — e.g. "Rewrite X so that Y happens when Z, without breaking W"]
+[Specific, actionable ask with a clear success criterion — e.g. \"Rewrite X so that Y happens when Z, without breaking W\"]
 
 Return JSON when done:
-{{"done": true, "assembled_prompt": "...", "category": "bug_fix"}}
+{{"done": true, "assembled_prompt": "...", "category": "bug_fix|feature|refactor|question"}}
 
 If developer clearly knows the answer already:
 {{"done": true, "should_refuse": true, "reason": "You already know: [hypothesis]"}}
@@ -205,9 +209,24 @@ async def run_conversation_turn(
         f"{m['role'].upper()}: {m['content']}" for m in conversation_history
     )
 
+    # Count questions already asked so the model knows exactly how many it has left.
+    questions_asked = sum(
+        1 for m in conversation_history
+        if m["role"] == "assistant" and "?" in m.get("content", "")
+    )
+    max_questions = 3 if mode == "mid" else 6
+    remaining = max(0, max_questions - questions_asked)
+    limit_note = (
+        f"Questions asked so far: {questions_asked}/{max_questions}. "
+        f"You have {remaining} question(s) remaining. "
+        + ("You MUST assemble the prompt now — do not ask another question." if remaining == 0
+           else "If 0 remain on your next turn, you must assemble immediately.")
+    )
+
     user_message = (
         f"Raw developer prompt: {raw_prompt}{context_block}\n\n"
         f"Conversation so far:\n{history_block}\n\n"
+        f"[SESSION STATUS] {limit_note}\n\n"
         "What should happen next?"
     )
 
