@@ -3,6 +3,9 @@
   "name": "PromptOS",
   "version": "0.1.0",
   "description": "Enhance your prompts before sending to Claude or ChatGPT",
+  "background": {
+    "service_worker": "background.js"
+  },
   "permissions": ["storage", "activeTab", "scripting"],
   "host_permissions": [
     "https://claude.ai/*",
@@ -24,5 +27,8 @@
       "resources": ["overlay.css", "overlay.html"],
       "matches": ["https://claude.ai/*", "https://chat.openai.com/*"]
     }
-  ]
+  ],
+  "externally_connectable": {
+    "matches": ["http://localhost:3000/*"]
+  }
 }

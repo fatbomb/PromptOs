@@ -83,10 +83,36 @@ export class PromptosSidebarProvider implements vscode.WebviewViewProvider {
         break;
       }
       case 'login': {
+        const state = Math.random().toString(36).substring(7);
         const base = new URL(this._apiBase);
         base.port = '3000';
-        base.pathname = '/auth/login';
+        base.pathname = '/login';
+        base.searchParams.set('state', state);
+
         vscode.env.openExternal(vscode.Uri.parse(base.toString()));
+
+        // Start polling for token (Task 5.1 Auth handoff)
+        let attempts = 0;
+        const poll = setInterval(async () => {
+          attempts++;
+          if (attempts > 30) {
+            clearInterval(poll);
+            return;
+          }
+
+          try {
+            const res = await fetch(`${this._apiBase}/auth/cli-token?state=${state}`);
+            if (res.ok) {
+              const { token } = (await res.json()) as { token: string };
+              await this._api.storeToken(token);
+              webview.postMessage({ type: 'loginSuccess' });
+              vscode.window.showInformationMessage('PromptOS: Logged in successfully!');
+              clearInterval(poll);
+            }
+          } catch (err) {
+            // Keep polling
+          }
+        }, 2000);
         break;
       }
     }

@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import MetricCard from '@/components/MetricCard';
 import SessionTable from '@/components/SessionTable';
 import WeeklyTrendChart from '@/components/WeeklyTrendChart';
+import ExtensionSync from '@/components/ExtensionSync';
 
 export default async function DashboardPage() {
   const cookieStore = cookies();
@@ -48,6 +49,7 @@ export default async function DashboardPage() {
 
   return (
     <main className="relative min-h-screen bg-[var(--bg-color)] text-[var(--text-primary)] p-6 md:p-12 overflow-hidden font-sans transition-colors duration-300">
+      <ExtensionSync />
       {/* Dynamic Background Glows */}
       <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] rounded-full bg-blue-600/10 blur-[120px] pointer-events-none"></div>
       <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full bg-purple-600/10 blur-[150px] pointer-events-none"></div>
