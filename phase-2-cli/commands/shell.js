@@ -116,6 +116,7 @@ export async function shellCommand() {
   while (true) {
     let line;
     try {
+      process.stdin.resume(); // Ensure stdin is active after inquirer commands
       line = await askLine();
     } catch {
       break; // stdin closed
