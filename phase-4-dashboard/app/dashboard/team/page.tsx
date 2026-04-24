@@ -3,8 +3,8 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import TeamActions from '@/components/TeamActions';
 import CopyInviteButton from '@/components/CopyInviteButton';
-
-export default async function TeamPage() {
+import TeamSelector from '@/components/TeamSelector';
+export default async function TeamPage({ searchParams }: { searchParams: { teamId?: string } }) {
   const cookieStore = cookies();
 
   const supabase = createServerClient(
@@ -25,54 +25,68 @@ export default async function TeamPage() {
   
   const userId = user.id;
 
-  // 1. Find user's team
-  const { data: membership } = await supabase
+  // 1. Find ALL user's teams
+  const { data: memberships } = await supabase
     .from('team_members')
     .select('team_id')
-    .eq('user_id', userId)
-    .maybeSingle();
+    .eq('user_id', userId);
 
   let teamInfo = null;
-  let members = [];
+  let members: { user_id: string; role: string; name: string; score: number }[] = [];
+  let otherTeams: { id: string; name: string }[] = [];
 
-  if (membership) {
+  if (memberships && memberships.length > 0) {
+    // Determine active team ID
+    const activeTeamId = searchParams.teamId || memberships[0].team_id;
+
+    // Fetch details for all teams to show in selector
+    const teamIds = memberships.map(m => m.team_id);
+    const { data: allTeams } = await supabase
+      .from('teams')
+      .select('id, name')
+      .in('id', teamIds);
+    
+    otherTeams = allTeams || [];
+    
+    // Fetch active team details
     const { data: team } = await supabase
       .from('teams')
       .select('*')
-      .eq('id', membership.team_id)
-      .single();
+      .eq('id', activeTeamId)
+      .maybeSingle();
     
-    teamInfo = team;
+    if (team) {
+      teamInfo = team;
 
-    const { data: teamMembers } = await supabase
-      .from('team_members')
-      .select('user_id, role')
-      .eq('team_id', membership.team_id);
-      
-    if (teamMembers) {
-      for (const m of teamMembers) {
-        const { data: decay } = await supabase
-          .from('skill_decay')
-          .select('avg_dependency_score')
-          .eq('user_id', m.user_id)
-          .order('week_start', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-          
-        members.push({
-          user_id: m.user_id,
-          role: m.role,
-          name: m.user_id === userId ? 'You' : `Dev_${m.user_id.substring(0, 5)}`,
-          score: decay?.avg_dependency_score || 0
+      const { data: teamMembers } = await supabase
+        .from('team_members')
+        .select('user_id, role')
+        .eq('team_id', activeTeamId);
+        
+      if (teamMembers) {
+        for (const m of teamMembers) {
+          const { data: decay } = await supabase
+            .from('skill_decay')
+            .select('avg_dependency_score')
+            .eq('user_id', m.user_id)
+            .order('week_start', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+            
+          members.push({
+            user_id: m.user_id,
+            role: m.role,
+            name: m.user_id === userId ? 'You' : `Dev_${m.user_id.substring(0, 5)}`,
+            score: decay?.avg_dependency_score || 0
+          });
+        }
+        
+        members.sort((a, b) => {
+          if (a.score === 0) return 1;
+          if (b.score === 0) return -1;
+          return a.score - b.score;
         });
       }
-      
-      // Sort: Lower dependency score is better. N/A (0) should go to the bottom.
-      members.sort((a, b) => {
-        if (a.score === 0) return 1;
-        if (b.score === 0) return -1;
-        return a.score - b.score;
-      });
     }
   }
 
@@ -82,15 +96,25 @@ export default async function TeamPage() {
       <div className="absolute top-[-10%] right-[-5%] w-[400px] h-[400px] rounded-full bg-cyan-600/10 blur-[120px] pointer-events-none"></div>
 
       <div className="max-w-7xl mx-auto relative z-10 animate-fade-in-up">
-        <header className="mb-12">
-          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-3">
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400">
-              Team Leaderboard
-            </span>
-          </h1>
-          <p className="text-gray-400 font-medium tracking-wide max-w-2xl">
-            AI Independence Ranking. Lower scores indicate higher self-sufficiency and reduced dependency on generated code.
-          </p>
+        <header className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div>
+            <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-3">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400">
+                Team Leaderboard
+              </span>
+            </h1>
+            <p className="text-gray-400 font-medium tracking-wide max-w-2xl">
+              AI Independence Ranking. Lower scores indicate higher self-sufficiency.
+            </p>
+          </div>
+          
+          {otherTeams.length > 0 && (
+            <TeamSelector 
+                teams={otherTeams} 
+                activeTeamId={teamInfo?.id || ''} 
+                userId={userId} 
+            />
+          )}
         </header>
 
         {teamInfo ? (
