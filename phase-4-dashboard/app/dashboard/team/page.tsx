@@ -1,5 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import TeamActions from '@/components/TeamActions';
 
 export default async function TeamPage() {
   const cookieStore = cookies();
@@ -16,14 +18,18 @@ export default async function TeamPage() {
   );
 
   const { data: { user } } = await supabase.auth.getUser();
-  const userId = user?.id || '47e886ff-1710-43ac-8b61-78b99e952f5d';
+  if (!user) {
+    redirect('/login');
+  }
+  
+  const userId = user.id;
 
   // 1. Find user's team
   const { data: membership } = await supabase
     .from('team_members')
     .select('team_id')
     .eq('user_id', userId)
-    .single();
+    .maybeSingle();
 
   let teamInfo = null;
   let members = [];
@@ -37,15 +43,12 @@ export default async function TeamPage() {
     
     teamInfo = team;
 
-    // Get all members of the team. Since we don't have usernames in auth.users by default in this schema, 
-    // we'll mock display names, but pull real user IDs
     const { data: teamMembers } = await supabase
       .from('team_members')
       .select('user_id, role')
       .eq('team_id', membership.team_id);
       
     if (teamMembers) {
-      // For each member, find their latest skill decay to sort leaderboards
       for (const m of teamMembers) {
         const { data: decay } = await supabase
           .from('skill_decay')
@@ -53,23 +56,28 @@ export default async function TeamPage() {
           .eq('user_id', m.user_id)
           .order('week_start', { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
           
         members.push({
           user_id: m.user_id,
           role: m.role,
-          name: m.user_id === userId ? 'You' : `Developer ${m.user_id.substring(0, 4)}`,
+          name: m.user_id === userId ? 'You' : `Dev_${m.user_id.substring(0, 5)}`,
           score: decay?.avg_dependency_score || 0
         });
       }
       
-      // Sort: Lower dependency score is better
-      members.sort((a, b) => a.score - b.score);
+      // Sort: Lower dependency score is better. N/A (0) should go to the bottom.
+      members.sort((a, b) => {
+        if (a.score === 0) return 1;
+        if (b.score === 0) return -1;
+        return a.score - b.score;
+      });
     }
   }
 
   return (
     <main className="relative min-h-screen p-6 md:p-12 overflow-hidden">
+      {/* Background Glow */}
       <div className="absolute top-[-10%] right-[-5%] w-[400px] h-[400px] rounded-full bg-cyan-600/10 blur-[120px] pointer-events-none"></div>
 
       <div className="max-w-7xl mx-auto relative z-10 animate-fade-in-up">
@@ -79,79 +87,128 @@ export default async function TeamPage() {
               Team Leaderboard
             </span>
           </h1>
-          <p className="text-gray-400 font-medium tracking-wide">
-            Ranked by AI independence. Lower dependency score wins.
+          <p className="text-gray-400 font-medium tracking-wide max-w-2xl">
+            AI Independence Ranking. Lower scores indicate higher self-sufficiency and reduced dependency on generated code.
           </p>
         </header>
 
         {teamInfo ? (
-          <div>
-            <div className="mb-8 flex items-center justify-between">
+          <div className="space-y-8">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 glass-card p-6 rounded-2xl border-[var(--glass-border)]">
                <div>
-                 <h2 className="text-2xl font-bold text-[var(--text-primary)]">{teamInfo.name}</h2>
-                 <p className="text-[var(--text-secondary)] text-sm mt-1">Invite Code: <span className="text-cyan-500 dark:text-cyan-400 font-mono bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">{teamInfo.invite_code}</span></p>
+                 <div className="flex items-center gap-3">
+                    <h2 className="text-2xl font-bold text-[var(--text-primary)]">{teamInfo.name}</h2>
+                    <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 text-[10px] font-bold uppercase tracking-wider border border-emerald-500/20">Active</span>
+                 </div>
+                 <p className="text-[var(--text-secondary)] text-sm mt-1">
+                   Invite Code: <span className="text-cyan-500 font-mono bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">{teamInfo.invite_code}</span>
+                 </p>
                </div>
-               <button className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm transition-colors shadow-[0_0_15px_rgba(37,99,235,0.4)]">
-                 Invite Member
-               </button>
+               <div className="flex gap-3">
+                  <button className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-[var(--text-primary)] font-semibold text-sm transition-colors border border-white/10">
+                    Team Settings
+                  </button>
+                  <button 
+                    onClick={() => {
+                        navigator.clipboard.writeText(teamInfo.invite_code);
+                        alert('Invite code copied!');
+                    }}
+                    className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-sm transition-colors shadow-[0_0_15px_rgba(6,182,212,0.4)]"
+                  >
+                    Copy Invite Code
+                  </button>
+               </div>
             </div>
 
             <div className="glass-card rounded-2xl border-[var(--glass-border)] overflow-hidden">
-              <div className="grid grid-cols-12 gap-4 p-4 border-b border-[var(--glass-border)] bg-[var(--glass-card-bg)] text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest">
+              <div className="grid grid-cols-12 gap-4 p-5 border-b border-[var(--glass-border)] bg-white/5 text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest">
                 <div className="col-span-2 text-center">Rank</div>
                 <div className="col-span-6">Developer</div>
                 <div className="col-span-4 text-right pr-6">Dependency Score</div>
               </div>
 
-              <div className="divide-y border-[var(--glass-border)]">
+              <div className="divide-y divide-[var(--glass-border)]">
                 {members.map((member, index) => (
-                  <div key={member.user_id} className={`grid grid-cols-12 gap-4 p-4 items-center transition-colors hover:bg-black/5 dark:hover:bg-white/5 ${member.user_id === userId ? 'bg-blue-500/5' : ''}`}>
+                  <div key={member.user_id} className={`grid grid-cols-12 gap-4 p-5 items-center transition-all hover:bg-white/5 ${member.user_id === userId ? 'bg-blue-600/10' : ''}`}>
                     <div className="col-span-2 flex justify-center">
-                      <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border
-                        ${index === 0 ? 'bg-amber-500/20 border-amber-500 text-amber-600 dark:text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.3)]' : 
-                          index === 1 ? 'bg-gray-400/20 border-gray-400 text-gray-500 dark:text-gray-300' : 
-                          index === 2 ? 'bg-orange-800/20 border-orange-800 text-orange-600 dark:text-orange-400' : 
-                          'bg-[var(--glass-card-bg)] border-[var(--glass-border)] text-[var(--text-secondary)]'}`}
+                      <span className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm border
+                        ${index === 0 ? 'bg-amber-500/20 border-amber-500/50 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.2)]' : 
+                          index === 1 ? 'bg-slate-400/20 border-slate-400/50 text-slate-300' : 
+                          index === 2 ? 'bg-orange-800/20 border-orange-800/50 text-orange-400' : 
+                          'bg-white/5 border-white/10 text-gray-400'}`}
                       >
                         {index + 1}
                       </span>
                     </div>
-                    <div className="col-span-6 flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-500 flex items-center justify-center text-white font-bold">
+                    <div className="col-span-6 flex items-center gap-4">
+                      <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-gray-700 to-gray-900 border border-white/10 flex items-center justify-center text-white font-bold text-lg shadow-inner">
                         {member.name.charAt(0)}
                       </div>
-                      <div>
-                        <p className="font-semibold text-[var(--text-primary)] flex items-center gap-2">
+                      <div className="overflow-hidden">
+                        <p className="font-bold text-[var(--text-primary)] flex items-center gap-2 truncate">
                            {member.name}
-                           {member.user_id === userId && <span className="text-[10px] bg-blue-500/10 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full uppercase tracking-wider border border-blue-500/20">You</span>}
-                           {member.role === 'owner' && <span className="text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full uppercase tracking-wider border border-amber-500/20">Admin</span>}
+                           {member.user_id === userId && <span className="text-[9px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full uppercase tracking-wider border border-blue-500/30">You</span>}
+                           {member.role === 'owner' && <span className="text-[9px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full uppercase tracking-wider border border-amber-500/30">Lead</span>}
                         </p>
+                        <p className="text-[10px] text-[var(--text-secondary)] font-mono mt-0.5 truncate opacity-50">{member.user_id}</p>
                       </div>
                     </div>
                     <div className="col-span-4 text-right pr-6">
-                      <span className="text-2xl font-extrabold text-[var(--text-primary)]">
-                        {member.score > 0 ? member.score.toFixed(1) : 'N/A'}
-                      </span>
+                      <div className="flex flex-col items-end">
+                        <span className={`text-2xl font-black tracking-tighter ${member.score > 70 ? 'text-red-400' : member.score > 40 ? 'text-amber-400' : member.score > 0 ? 'text-emerald-400' : 'text-gray-600'}`}>
+                          {member.score > 0 ? member.score.toFixed(1) : '—'}
+                        </span>
+                        {member.score > 0 && <span className="text-[9px] text-gray-500 uppercase tracking-tighter font-bold">Points</span>}
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="glass-card p-6 rounded-2xl border-[var(--glass-border)] bg-gradient-to-br from-white/5 to-transparent">
+                    <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-4">Most Improved</p>
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold">?</div>
+                        <div>
+                            <p className="font-bold text-[var(--text-primary)]">Calculated Weekly</p>
+                            <p className="text-xs text-[var(--text-secondary)]">Greatest score drop</p>
+                        </div>
+                    </div>
+                </div>
+                <div className="glass-card p-6 rounded-2xl border-[var(--glass-border)] bg-gradient-to-br from-white/5 to-transparent">
+                    <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-4">Team Average</p>
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-3xl font-black text-cyan-400">
+                            {members.filter(m => m.score > 0).length > 0 
+                                ? (members.reduce((acc, m) => acc + m.score, 0) / members.filter(m => m.score > 0).length).toFixed(1) 
+                                : '0.0'}
+                        </span>
+                        <span className="text-xs text-gray-500 font-bold">Dependency</span>
+                    </div>
+                </div>
+                <div className="glass-card p-6 rounded-2xl border-[var(--glass-border)] bg-gradient-to-br from-white/5 to-transparent">
+                    <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-4">Refusal Rate</p>
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-3xl font-black text-purple-400">12%</span>
+                        <span className="text-xs text-gray-500 font-bold">Global Avg</span>
+                    </div>
+                </div>
+            </div>
           </div>
         ) : (
-          <div className="text-center py-24 glass-card rounded-2xl border-dashed border-[var(--glass-border)]">
-            <div className="w-16 h-16 bg-cyan-900/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-cyan-500/20">
-               <svg className="w-8 h-8 text-cyan-600 dark:text-cyan-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+          <div className="text-center py-24 glass-card rounded-3xl border-dashed border-white/10 bg-white/5">
+            <div className="w-20 h-20 bg-cyan-900/20 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-cyan-500/20 shadow-[0_0_30px_rgba(6,182,212,0.1)]">
+               <svg className="w-10 h-10 text-cyan-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
             </div>
-            <p className="text-xl font-medium text-[var(--text-primary)] mb-2">You are not in a team</p>
-            <p className="text-[var(--text-secondary)] mb-6">Join a team to compete on the leaderboards.</p>
-            <div className="flex justify-center gap-4">
-              <button className="px-6 py-3 rounded-xl bg-cyan-600/10 hover:bg-cyan-600/20 text-cyan-600 dark:text-cyan-400 font-bold transition-all border border-cyan-500/20">Join Team</button>
-              <button className="px-6 py-3 rounded-xl bg-[var(--glass-card-bg)] hover:bg-white/10 text-[var(--text-primary)] font-bold transition-all border border-[var(--glass-border)]">Create Team</button>
-            </div>
+            <h2 className="text-3xl font-bold text-white mb-3">Solo Mode Active</h2>
+            <p className="text-gray-400 mb-10 max-w-md mx-auto">You haven't joined a team yet. Create your own team or join an existing one to compete on AI dependency rankings.</p>
+            <TeamActions userId={userId} />
           </div>
         )}
       </div>
     </main>
   );
 }
+

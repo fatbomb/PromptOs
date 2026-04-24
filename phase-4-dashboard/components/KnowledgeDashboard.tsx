@@ -6,9 +6,10 @@ import QuizModal from '@/components/QuizModal';
 
 interface Props {
   concepts: any[];
+  userId: string;
 }
 
-export default function KnowledgeDashboard({ concepts }: Props) {
+export default function KnowledgeDashboard({ concepts, userId }: Props) {
   const [activeQuiz, setActiveQuiz] = useState<string | null>(null);
 
   return (
@@ -34,7 +35,11 @@ export default function KnowledgeDashboard({ concepts }: Props) {
       )}
 
       {activeQuiz && (
-        <QuizModal concept={activeQuiz} onClose={() => setActiveQuiz(null)} />
+        <QuizModal 
+          concept={activeQuiz} 
+          userId={userId}
+          onClose={() => setActiveQuiz(null)} 
+        />
       )}
     </div>
   );

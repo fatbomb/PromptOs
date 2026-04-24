@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface Question {
   q: string;
@@ -10,12 +11,15 @@ interface Question {
 
 interface Props {
   concept: string;
+  userId: string;
   onClose: () => void;
 }
 
-export default function QuizModal({ concept, onClose }: Props) {
+export default function QuizModal({ concept, userId, onClose }: Props) {
+  const router = useRouter();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [score, setScore] = useState(0);
   const [finished, setFinished] = useState(false);
@@ -42,9 +46,33 @@ export default function QuizModal({ concept, onClose }: Props) {
     loadQuiz();
   }, [concept]);
 
+  const submitResult = async (finalScore: number) => {
+    setSubmitting(true);
+    try {
+      const percentage = (finalScore / questions.length) * 100;
+      await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'}/quiz/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userId,
+          concept: concept,
+          score: percentage
+        }),
+      });
+      router.refresh();
+    } catch (err) {
+      console.error('Failed to submit quiz:', err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleNext = () => {
-    if (selected === questions[currentIdx].correct_index) {
-      setScore(score + 1);
+    const isCorrect = selected === questions[currentIdx].correct_index;
+    const newScore = isCorrect ? score + 1 : score;
+    
+    if (isCorrect) {
+      setScore(newScore);
     }
     
     if (currentIdx < questions.length - 1) {
@@ -52,6 +80,7 @@ export default function QuizModal({ concept, onClose }: Props) {
       setSelected(null);
     } else {
       setFinished(true);
+      submitResult(newScore);
     }
   };
 
@@ -115,10 +144,10 @@ export default function QuizModal({ concept, onClose }: Props) {
 
             <button
               onClick={handleNext}
-              disabled={selected === null}
+              disabled={selected === null || submitting}
               className="w-full py-4 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold hover:shadow-[0_0_20px_rgba(168,85,247,0.4)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {currentIdx === questions.length - 1 ? 'Submit Answers' : 'Next Question'}
+              {submitting ? 'Saving Results...' : (currentIdx === questions.length - 1 ? 'Submit Answers' : 'Next Question')}
             </button>
           </div>
         ) : (

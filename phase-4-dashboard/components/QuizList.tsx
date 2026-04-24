@@ -13,9 +13,10 @@ interface Concept {
 
 interface Props {
   concepts: Concept[];
+  userId: string;
 }
 
-export default function QuizList({ concepts }: Props) {
+export default function QuizList({ concepts, userId }: Props) {
   const [activeQuiz, setActiveQuiz] = useState<string | null>(null);
 
   const getStatusColor = (band: string) => {
@@ -71,7 +72,11 @@ export default function QuizList({ concepts }: Props) {
       )}
 
       {activeQuiz && (
-        <QuizModal concept={activeQuiz} onClose={() => setActiveQuiz(null)} />
+        <QuizModal 
+          concept={activeQuiz} 
+          userId={userId}
+          onClose={() => setActiveQuiz(null)} 
+        />
       )}
     </div>
   );

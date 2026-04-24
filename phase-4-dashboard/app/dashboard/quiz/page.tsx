@@ -10,11 +10,6 @@ export default async function QuizPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
-        set() {},
-        remove() {},
         getAll: () => cookieStore.getAll(),
         setAll: () => {},
       },
@@ -49,7 +44,7 @@ export default async function QuizPage() {
           </p>
         </header>
 
-        <QuizList concepts={concepts || []} />
+        <QuizList concepts={concepts || []} userId={userId} />
       </div>
     </main>
   );

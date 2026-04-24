@@ -16,11 +16,6 @@ export default async function DashboardPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
-        set() {},
-        remove() {},
         getAll: () => cookieStore.getAll(),
         setAll: () => {},
       },
@@ -135,7 +130,7 @@ export default async function DashboardPage() {
 
         {/* Knowledge Map Section */}
         <section className="mb-12 animate-fade-in-up delay-500">
-          <KnowledgeDashboard concepts={concepts || []} />
+          <KnowledgeDashboard concepts={concepts || []} userId={userId} />
         </section>
 
         {/* Session history */}
