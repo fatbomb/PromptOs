@@ -1,17 +1,78 @@
 /**
- * Browser Extension Content Script — Phase 5, Task 5.4
+ * Browser Extension Content Script — PromptOS Copilot
  *
- * Injects the "Enhance with PromptOS" button below the chat input
+ * Injects the "⚡ PromptOS Copilot" button below the chat input
  * on claude.ai and chat.openai.com.
  * Uses Shadow DOM to isolate the overlay UI from the host page's CSS.
  *
- * Real question flow:
- *   POST /session/start → loop POST /session/message → inject assembled prompt
+ * Command Center → Context + Mode + Tool → Question Flow → Inject
  */
 
 const API_BASE = 'http://localhost:8000';
 
-// JWT stored in chrome.storage.local — optional when backend runs in dev mode (AUTH_REQUIRED=false)
+// ---------------------------------------------------------------------------
+// Session configuration state
+// ---------------------------------------------------------------------------
+
+interface SessionConfig {
+  mode: string;
+  targetTool: string;
+  contextCode: string;
+  contextError: string;
+  contextProject: string;
+}
+
+let sessionConfig: SessionConfig = {
+  mode: 'default',
+  targetTool: 'auto',
+  contextCode: '',
+  contextError: '',
+  contextProject: '',
+};
+
+// ---------------------------------------------------------------------------
+// Mode & preset definitions
+// ---------------------------------------------------------------------------
+
+interface ModeOption {
+  id: string;
+  icon: string;
+  label: string;
+  backendMode: string;
+  desc: string;
+}
+
+const MODES: ModeOption[] = [
+  { id: 'bugfix',   icon: '🐛', label: 'Bug Fix',   backendMode: 'default', desc: 'Full deep-dive debugging' },
+  { id: 'feature',  icon: '✨', label: 'Feature',   backendMode: 'default', desc: 'Build something new' },
+  { id: 'refactor', icon: '♻️', label: 'Refactor',  backendMode: 'mid',     desc: 'Clean up existing code' },
+  { id: 'review',   icon: '🔍', label: 'Review',    backendMode: 'mid',     desc: 'Code review assistance' },
+  { id: 'learn',    icon: '📖', label: 'Learn',     backendMode: 'skip',    desc: 'Instant explanation' },
+];
+
+interface PresetOption {
+  icon: string;
+  label: string;
+  prompt: string;
+  mode: string;
+  contextType: string;
+}
+
+const PRESETS: PresetOption[] = [
+  { icon: '🐛', label: 'Debug this error',    prompt: 'Help me debug this error',                      mode: 'default', contextType: 'error' },
+  { icon: '📝', label: 'Explain this code',    prompt: 'Explain how this code works step by step',      mode: 'skip',    contextType: 'code' },
+  { icon: '♻️', label: 'Refactor for perf',   prompt: 'Refactor this code for better performance',     mode: 'mid',     contextType: 'code' },
+  { icon: '🧪', label: 'Write tests',          prompt: 'Write comprehensive tests for this code',       mode: 'mid',     contextType: 'code' },
+  { icon: '📖', label: 'How does this work?',  prompt: 'Explain the architecture and design decisions', mode: 'skip',    contextType: '' },
+  { icon: '🔒', label: 'Security audit',       prompt: 'Review this code for security vulnerabilities', mode: 'mid',     contextType: 'code' },
+];
+
+const TOOLS = ['auto', 'claude', 'chatgpt', 'gemini'] as const;
+
+// ---------------------------------------------------------------------------
+// JWT helper
+// ---------------------------------------------------------------------------
+
 async function getToken(): Promise<string | null> {
   return new Promise((resolve) => {
     chrome.storage.local.get('promptos_jwt', (result) => {
@@ -45,6 +106,7 @@ interface SiteConfig {
   host: string;
   inputSelector: string;
   buttonContainer: string;
+  toolName: string;
 }
 
 const SITES: Record<string, SiteConfig> = {
@@ -52,11 +114,13 @@ const SITES: Record<string, SiteConfig> = {
     host: 'claude.ai',
     inputSelector: 'div[contenteditable="true"]',
     buttonContainer: 'fieldset',
+    toolName: 'claude',
   },
   chatgpt: {
     host: 'chat.openai.com',
     inputSelector: 'textarea#prompt-textarea',
     buttonContainer: 'form',
+    toolName: 'chatgpt',
   },
 };
 
@@ -64,7 +128,6 @@ const currentSite = Object.values(SITES).find((s) =>
   window.location.hostname.includes(s.host)
 );
 if (!currentSite) {
-  // Not on a supported site — do nothing
   throw new Error('PromptOS: unsupported site');
 }
 
@@ -80,13 +143,13 @@ function injectButton(): void {
 
   const btn = document.createElement('button');
   btn.id = 'promptos-inject-btn';
-  btn.innerText = '⚡ Enhance with PromptOS';
+  btn.innerText = '⚡ PromptOS Copilot';
   btn.style.cssText = `
-    background: #2563eb;
+    background: linear-gradient(90deg, #7C3AED, #06B6D4);
     color: white;
     border: none;
-    border-radius: 6px;
-    padding: 6px 14px;
+    border-radius: 8px;
+    padding: 7px 16px;
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
@@ -95,7 +158,11 @@ function injectButton(): void {
     align-items: center;
     gap: 6px;
     z-index: 9999;
+    transition: opacity 0.15s, transform 0.15s;
   `;
+
+  btn.onmouseenter = () => { btn.style.opacity = '0.9'; btn.style.transform = 'translateY(-1px)'; };
+  btn.onmouseleave = () => { btn.style.opacity = '1'; btn.style.transform = 'translateY(0)'; };
 
   btn.onclick = (e) => {
     e.preventDefault();
@@ -107,11 +174,10 @@ function injectButton(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Overlay — Shadow DOM isolated question flow
+// Overlay — Shadow DOM isolated Command Center
 // ---------------------------------------------------------------------------
 
 function openOverlay(): void {
-  // Prevent duplicate overlays
   if (document.getElementById('promptos-overlay-host')) return;
 
   const inputEl = document.querySelector(
@@ -124,21 +190,27 @@ function openOverlay(): void {
       : inputEl.innerText
     : '';
 
-  // Host element + Shadow DOM
+  // Reset session config
+  sessionConfig = {
+    mode: 'default',
+    targetTool: currentSite!.toolName,
+    contextCode: '',
+    contextError: '',
+    contextProject: '',
+  };
+
   const hostDiv = document.createElement('div');
   hostDiv.id = 'promptos-overlay-host';
   hostDiv.style.cssText =
-    'position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.65);';
+    'position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);';
 
   const shadow = hostDiv.attachShadow({ mode: 'open' });
 
-  // Inject styles
   const style = document.createElement('style');
   style.textContent = overlayCSS();
   shadow.appendChild(style);
 
-  // Initial UI — show raw prompt, Start Flow button
-  shadow.appendChild(buildInitialUI(rawPrompt));
+  shadow.appendChild(buildCommandCenter(rawPrompt));
   document.body.appendChild(hostDiv);
 
   // Close on backdrop click
@@ -146,13 +218,221 @@ function openOverlay(): void {
     if (e.target === hostDiv) hostDiv.remove();
   });
 
-  // Wire up Start Flow
-  shadow.getElementById('promptos-start-btn')!.addEventListener('click', () => {
-    runQuestionFlow(shadow, hostDiv, inputEl, rawPrompt);
+  wireCommandCenter(shadow, hostDiv, inputEl, rawPrompt);
+}
+
+// ---------------------------------------------------------------------------
+// Command Center — the new initial UI
+// ---------------------------------------------------------------------------
+
+function buildCommandCenter(rawPrompt: string): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.id = 'promptos-wrapper';
+
+  const autoTool = currentSite!.toolName;
+  const toolButtons = TOOLS.map((t) => {
+    const isActive = t === autoTool;
+    const label = t === 'auto' ? `Auto (${autoTool})` : t.charAt(0).toUpperCase() + t.slice(1);
+    return `<button class="tool-btn${isActive ? ' active' : ''}" data-tool="${t}">${label}</button>`;
+  }).join('');
+
+  const modeButtons = MODES.map((m, i) => {
+    const isActive = i === 0;
+    return `<button class="mode-btn${isActive ? ' active' : ''}" data-mode-id="${m.id}" data-backend-mode="${m.backendMode}" title="${m.desc}">${m.icon} ${m.label}</button>`;
+  }).join('');
+
+  const presetChips = PRESETS.map((p, i) =>
+    `<button class="preset-chip" data-preset-idx="${i}">${p.icon} ${p.label}</button>`
+  ).join('');
+
+  wrapper.innerHTML = `
+    <div class="modal command-center">
+      <div class="modal-header">
+        <span class="modal-title">⚡ PromptOS Copilot</span>
+        <span class="header-badge">coding companion</span>
+        <button id="promptos-close-btn" class="close-btn">×</button>
+      </div>
+      <div class="modal-body">
+
+        <!-- Prompt Preview -->
+        <div class="section">
+          <div class="section-header" id="promptos-prompt-toggle">
+            <span class="section-icon">💬</span>
+            <span class="section-label">YOUR PROMPT</span>
+            <span class="section-chevron">▾</span>
+          </div>
+          <div id="promptos-prompt-body" class="section-body">
+            <pre class="prompt-preview">${escapeHtml(rawPrompt || '(empty — type a prompt first)')}</pre>
+          </div>
+        </div>
+
+        <!-- Context Panel -->
+        <div class="section">
+          <div class="section-header" id="promptos-context-toggle">
+            <span class="section-icon">📎</span>
+            <span class="section-label">ADD CONTEXT</span>
+            <span class="context-badge" id="promptos-context-badge" style="display:none;">0</span>
+            <span class="section-chevron collapsed">▾</span>
+          </div>
+          <div id="promptos-context-body" class="section-body" style="display:none;">
+            <div class="context-tabs">
+              <button class="ctx-tab active" data-ctx="code">📄 Code</button>
+              <button class="ctx-tab" data-ctx="error">🚨 Error Log</button>
+              <button class="ctx-tab" data-ctx="project">🏗️ Stack</button>
+            </div>
+            <div class="ctx-panel" id="promptos-ctx-code">
+              <textarea id="promptos-ctx-code-input" class="ctx-textarea" placeholder="Paste your code snippet, file contents, or relevant function here..."></textarea>
+            </div>
+            <div class="ctx-panel" id="promptos-ctx-error" style="display:none;">
+              <textarea id="promptos-ctx-error-input" class="ctx-textarea" placeholder="Paste terminal errors, stack traces, or compiler output..."></textarea>
+            </div>
+            <div class="ctx-panel" id="promptos-ctx-project" style="display:none;">
+              <input id="promptos-ctx-project-input" class="ctx-input" type="text" placeholder="e.g. Next.js 14 + Prisma + PostgreSQL + Tailwind" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Mode Selector -->
+        <div class="section">
+          <div class="section-header-static">
+            <span class="section-icon">🎯</span>
+            <span class="section-label">MODE</span>
+          </div>
+          <div class="mode-grid">${modeButtons}</div>
+        </div>
+
+        <!-- Target Tool -->
+        <div class="section">
+          <div class="section-header-static">
+            <span class="section-icon">🎯</span>
+            <span class="section-label">OPTIMIZED FOR</span>
+          </div>
+          <div class="tool-grid">${toolButtons}</div>
+        </div>
+
+        <!-- Smart Presets -->
+        <div class="section">
+          <div class="section-header-static">
+            <span class="section-icon">⚡</span>
+            <span class="section-label">QUICK ACTIONS</span>
+          </div>
+          <div class="presets-grid">${presetChips}</div>
+        </div>
+
+        <!-- Start Button -->
+        <button id="promptos-start-btn" class="primary-btn glow-btn">Start Refinement →</button>
+      </div>
+    </div>
+  `;
+  return wrapper;
+}
+
+function wireCommandCenter(
+  shadow: ShadowRoot,
+  hostDiv: HTMLElement,
+  inputEl: HTMLElement | HTMLTextAreaElement | null,
+  rawPrompt: string
+): void {
+  // Close
+  shadow.getElementById('promptos-close-btn')!.addEventListener('click', () => hostDiv.remove());
+
+  // Prompt section toggle
+  shadow.getElementById('promptos-prompt-toggle')?.addEventListener('click', () => {
+    const body = shadow.getElementById('promptos-prompt-body')!;
+    const chevron = shadow.querySelector('#promptos-prompt-toggle .section-chevron')!;
+    const isHidden = body.style.display === 'none';
+    body.style.display = isHidden ? 'block' : 'none';
+    chevron.classList.toggle('collapsed', !isHidden);
   });
 
-  shadow.getElementById('promptos-close-btn')!.addEventListener('click', () => {
-    hostDiv.remove();
+  // Context section toggle
+  shadow.getElementById('promptos-context-toggle')?.addEventListener('click', () => {
+    const body = shadow.getElementById('promptos-context-body')!;
+    const chevron = shadow.querySelector('#promptos-context-toggle .section-chevron')!;
+    const isHidden = body.style.display === 'none';
+    body.style.display = isHidden ? 'block' : 'none';
+    chevron.classList.toggle('collapsed', !isHidden);
+  });
+
+  // Context tabs
+  shadow.querySelectorAll('.ctx-tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      const ctx = (tab as HTMLElement).dataset.ctx!;
+      shadow.querySelectorAll('.ctx-tab').forEach((t) => t.classList.remove('active'));
+      tab.classList.add('active');
+      shadow.querySelectorAll('.ctx-panel').forEach((p) => (p as HTMLElement).style.display = 'none');
+      shadow.getElementById(`promptos-ctx-${ctx}`)!.style.display = 'block';
+    });
+  });
+
+  // Context badge updater
+  const updateContextBadge = () => {
+    const code = (shadow.getElementById('promptos-ctx-code-input') as HTMLTextAreaElement)?.value || '';
+    const error = (shadow.getElementById('promptos-ctx-error-input') as HTMLTextAreaElement)?.value || '';
+    const project = (shadow.getElementById('promptos-ctx-project-input') as HTMLInputElement)?.value || '';
+    sessionConfig.contextCode = code;
+    sessionConfig.contextError = error;
+    sessionConfig.contextProject = project;
+    const count = [code, error, project].filter((v) => v.trim().length > 0).length;
+    const badge = shadow.getElementById('promptos-context-badge')!;
+    badge.textContent = String(count);
+    badge.style.display = count > 0 ? 'inline-flex' : 'none';
+  };
+  shadow.getElementById('promptos-ctx-code-input')?.addEventListener('input', updateContextBadge);
+  shadow.getElementById('promptos-ctx-error-input')?.addEventListener('input', updateContextBadge);
+  shadow.getElementById('promptos-ctx-project-input')?.addEventListener('input', updateContextBadge);
+
+  // Mode selector
+  shadow.querySelectorAll('.mode-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      shadow.querySelectorAll('.mode-btn').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      sessionConfig.mode = (btn as HTMLElement).dataset.backendMode!;
+    });
+  });
+
+  // Tool selector
+  shadow.querySelectorAll('.tool-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      shadow.querySelectorAll('.tool-btn').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      sessionConfig.targetTool = (btn as HTMLElement).dataset.tool!;
+    });
+  });
+
+  // Smart presets
+  shadow.querySelectorAll('.preset-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const idx = parseInt((chip as HTMLElement).dataset.presetIdx!, 10);
+      const preset = PRESETS[idx];
+      // Set mode
+      sessionConfig.mode = preset.mode;
+      shadow.querySelectorAll('.mode-btn').forEach((b) => {
+        const bMode = MODES.find((m) => m.backendMode === preset.mode);
+        b.classList.toggle('active', (b as HTMLElement).dataset.backendMode === preset.mode && (b as HTMLElement).dataset.modeId === bMode?.id);
+      });
+      // Expand context panel if needed
+      if (preset.contextType) {
+        const body = shadow.getElementById('promptos-context-body')!;
+        body.style.display = 'block';
+        shadow.querySelectorAll('.ctx-tab').forEach((t) => {
+          t.classList.toggle('active', (t as HTMLElement).dataset.ctx === preset.contextType);
+        });
+        shadow.querySelectorAll('.ctx-panel').forEach((p) => (p as HTMLElement).style.display = 'none');
+        const panel = shadow.getElementById(`promptos-ctx-${preset.contextType}`);
+        if (panel) panel.style.display = 'block';
+      }
+      // Start session with preset prompt
+      const finalPrompt = rawPrompt ? `${rawPrompt}\n\n${preset.prompt}` : preset.prompt;
+      updateContextBadge();
+      runQuestionFlow(shadow, hostDiv, inputEl, finalPrompt);
+    });
+  });
+
+  // Start button
+  shadow.getElementById('promptos-start-btn')!.addEventListener('click', () => {
+    updateContextBadge();
+    runQuestionFlow(shadow, hostDiv, inputEl, rawPrompt);
   });
 }
 
@@ -168,7 +448,6 @@ async function runQuestionFlow(
 ): Promise<void> {
   setContent(shadow, loadingHTML('Starting session...'));
 
-  // Check auth first
   const token = await getToken();
   if (!token) {
     setContent(shadow, loginHTML());
@@ -180,9 +459,22 @@ async function runQuestionFlow(
     return;
   }
 
+  // Build workspace context from gathered inputs
+  const workspaceContext: Record<string, string> = {};
+  if (sessionConfig.contextCode.trim()) workspaceContext.code_snippet = sessionConfig.contextCode;
+  if (sessionConfig.contextError.trim()) workspaceContext.error_log = sessionConfig.contextError;
+  if (sessionConfig.contextProject.trim()) workspaceContext.project_stack = sessionConfig.contextProject;
+
+  const resolvedTool = sessionConfig.targetTool === 'auto' ? currentSite!.toolName : sessionConfig.targetTool;
+
   let sessionId: string;
   try {
-    const startRes = await apiFetch('/session/start', { raw_prompt: rawPrompt });
+    const startRes = await apiFetch('/session/start', {
+      raw_prompt: rawPrompt,
+      mode: sessionConfig.mode,
+      target_tool: resolvedTool,
+      workspace_context: Object.keys(workspaceContext).length > 0 ? workspaceContext : null,
+    });
     sessionId = startRes.session_id as string;
   } catch (err) {
     const errMsg = String(err);
@@ -225,11 +517,9 @@ async function askNextQuestion(
 
   if (msgRes.done) {
     if (msgRes.should_refuse) {
-      // Refusal Engine fired
       setContent(shadow, refusalHTML(msgRes.message as string));
       shadow.getElementById('promptos-restart-btn')?.addEventListener('click', () => hostDiv.remove());
     } else {
-      // Session complete — inject assembled prompt
       const assembled = msgRes.assembled_prompt as string;
       const scores = msgRes.scores as Record<string, number> | undefined;
       setContent(shadow, completeHTML(assembled, scores));
@@ -238,24 +528,35 @@ async function askNextQuestion(
         injectPrompt(inputEl, assembled);
         hostDiv.remove();
       });
+      shadow.getElementById('promptos-copy-btn')?.addEventListener('click', () => {
+        navigator.clipboard.writeText(assembled);
+        const copyBtn = shadow.getElementById('promptos-copy-btn');
+        if (copyBtn) { copyBtn.textContent = '✓ Copied!'; setTimeout(() => { copyBtn.textContent = '📋 Copy'; }, 1500); }
+      });
       shadow.getElementById('promptos-cancel-btn')?.addEventListener('click', () => hostDiv.remove());
       shadow.getElementById('promptos-close-btn')?.addEventListener('click', () => hostDiv.remove());
     }
     return;
   }
 
-  // Show next question
   const question = msgRes.question as string;
-  setContent(shadow, questionHTML(question, turnNum));
+  const options = msgRes.options as string[] | undefined;
+  setContent(shadow, questionHTML(question, turnNum, options));
 
-  const submitAnswer = async () => {
+  const submitAnswer = async (answerText?: string) => {
     const input = shadow.getElementById('promptos-answer-input') as HTMLInputElement | null;
-    const answer = input?.value.trim();
+    const answer = answerText || input?.value.trim();
     if (!answer) return;
     await askNextQuestion(shadow, hostDiv, inputEl, sessionId, answer, turnNum + 1);
   };
 
-  shadow.getElementById('promptos-submit-btn')?.addEventListener('click', submitAnswer);
+  shadow.getElementById('promptos-submit-btn')?.addEventListener('click', () => submitAnswer());
+  shadow.getElementById('promptos-skip-btn')?.addEventListener('click', () => submitAnswer('Skip'));
+
+  options?.forEach((opt, idx) => {
+    shadow.getElementById(`promptos-opt-${idx}`)?.addEventListener('click', () => submitAnswer(opt));
+  });
+
   const answerInput = shadow.getElementById('promptos-answer-input') as HTMLInputElement | null;
   answerInput?.addEventListener('keydown', (e) => {
     if ((e as KeyboardEvent).key === 'Enter') submitAnswer();
@@ -277,14 +578,13 @@ function injectPrompt(
   } else {
     inputEl.innerText = text;
   }
-  // Trigger React/framework synthetic event so the page picks up the change
   inputEl.dispatchEvent(new Event('input', { bubbles: true }));
   inputEl.dispatchEvent(new Event('change', { bubbles: true }));
   inputEl.focus();
 }
 
 // ---------------------------------------------------------------------------
-// Shadow DOM helpers — set inner content
+// Shadow DOM helpers
 // ---------------------------------------------------------------------------
 
 function setContent(shadow: ShadowRoot, html: string): void {
@@ -301,25 +601,6 @@ function setContent(shadow: ShadowRoot, html: string): void {
 // HTML templates
 // ---------------------------------------------------------------------------
 
-function buildInitialUI(rawPrompt: string): HTMLElement {
-  const wrapper = document.createElement('div');
-  wrapper.id = 'promptos-wrapper';
-  wrapper.innerHTML = `
-    <div class="modal">
-      <div class="modal-header">
-        <span class="modal-title">⚡ PromptOS Refinement</span>
-        <button id="promptos-close-btn" class="close-btn">×</button>
-      </div>
-      <div class="modal-body">
-        <p class="label">Your current prompt</p>
-        <pre class="prompt-preview">${escapeHtml(rawPrompt || '(empty — type a prompt first)')}</pre>
-        <button id="promptos-start-btn" class="primary-btn">Start Refinement →</button>
-      </div>
-    </div>
-  `;
-  return wrapper;
-}
-
 function loadingHTML(msg: string): string {
   return `
     <div class="modal">
@@ -333,17 +614,30 @@ function loadingHTML(msg: string): string {
   `;
 }
 
-function questionHTML(question: string, turn: number): string {
-  const dots = Array.from({ length: 4 }, (_, i) =>
+function questionHTML(question: string, turn: number, options?: string[]): string {
+  const maxQ = sessionConfig.mode === 'mid' ? 3 : sessionConfig.mode === 'skip' ? 1 : 6;
+  const dots = Array.from({ length: Math.min(maxQ, 6) }, (_, i) =>
     `<span class="step-dot${i < turn ? ' active' : ''}"></span>`
   ).join('');
+
+  let optionsHTML = '';
+  if (options && Array.isArray(options) && options.length > 0) {
+    optionsHTML = `
+      <div class="options-container">
+        ${options.map((opt, i) => `<button id="promptos-opt-${i}" class="option-pill">${escapeHtml(opt)}</button>`).join('')}
+      </div>
+    `;
+  }
+
+  const modeLabel = MODES.find((m) => m.backendMode === sessionConfig.mode)?.label || 'Default';
 
   return `
     <div class="modal">
       <div class="modal-header">
-        <span class="modal-title">⚡ PromptOS</span>
+        <span class="modal-title">⚡ PromptOS Copilot</span>
         <div class="step-info">
-          <span>Q${turn} of ~4</span>
+          <span class="mode-badge-sm">${modeLabel}</span>
+          <span>Q${turn} of ~${maxQ}</span>
           <div class="step-dots">${dots}</div>
         </div>
         <div style="width:24px"></div>
@@ -352,8 +646,12 @@ function questionHTML(question: string, turn: number): string {
         <div class="question-card">
           <p class="question-text">${escapeHtml(question)}</p>
         </div>
-        <input id="promptos-answer-input" class="answer-input" type="text" placeholder="Your answer... (Enter to submit)" autocomplete="off" />
-        <button id="promptos-submit-btn" class="primary-btn">Submit →</button>
+        ${optionsHTML}
+        <input id="promptos-answer-input" class="answer-input" type="text" placeholder="Or type your answer... (Enter to submit)" autocomplete="off" />
+        <div class="action-buttons">
+          <button id="promptos-skip-btn" class="secondary-btn" style="flex: 1;">Skip</button>
+          <button id="promptos-submit-btn" class="primary-btn" style="flex: 2;">Submit →</button>
+        </div>
       </div>
     </div>
   `;
@@ -381,6 +679,9 @@ function scoreBarHTML(val: number): string {
 }
 
 function completeHTML(assembled: string, scores?: Record<string, number>): string {
+  const modeLabel = MODES.find((m) => m.backendMode === sessionConfig.mode)?.label || 'Default';
+  const toolLabel = sessionConfig.targetTool === 'auto' ? currentSite!.toolName : sessionConfig.targetTool;
+
   const scoresHTML = scores ? `
     <div class="scores">
       <div class="score-row">
@@ -402,6 +703,12 @@ function completeHTML(assembled: string, scores?: Record<string, number>): strin
     </div>
   ` : '';
 
+  const contextSummary = [
+    sessionConfig.contextCode ? '📄 Code' : '',
+    sessionConfig.contextError ? '🚨 Error' : '',
+    sessionConfig.contextProject ? '🏗️ Stack' : '',
+  ].filter(Boolean).join(' · ');
+
   return `
     <div class="modal">
       <div class="modal-header">
@@ -409,10 +716,18 @@ function completeHTML(assembled: string, scores?: Record<string, number>): strin
         <button id="promptos-close-btn" class="close-btn">×</button>
       </div>
       <div class="modal-body">
+        <div class="result-badges">
+          <span class="result-badge purple">${modeLabel}</span>
+          <span class="result-badge cyan">${toolLabel}</span>
+          ${contextSummary ? `<span class="result-badge green">${contextSummary}</span>` : ''}
+        </div>
         <pre class="assembled-prompt">${escapeHtml(assembled)}</pre>
         ${scoresHTML}
         <button id="promptos-inject-btn-confirm" class="accent-btn">Inject into chat →</button>
-        <button id="promptos-cancel-btn" class="secondary-btn">Cancel</button>
+        <div class="action-buttons">
+          <button id="promptos-copy-btn" class="secondary-btn" style="flex: 1;">📋 Copy</button>
+          <button id="promptos-cancel-btn" class="secondary-btn" style="flex: 1;">Cancel</button>
+        </div>
       </div>
     </div>
   `;
@@ -422,7 +737,7 @@ function loginHTML(): string {
   return `
     <div class="modal">
       <div class="modal-header">
-        <span class="modal-title">⚡ PromptOS</span>
+        <span class="modal-title">⚡ PromptOS Copilot</span>
         <button id="promptos-close-login-btn" class="close-btn">×</button>
       </div>
       <div class="modal-body center" style="padding: 24px 16px;">
@@ -474,9 +789,9 @@ function overlayCSS(): string {
       border-top: 2px solid transparent;
       border-image: linear-gradient(90deg, #7C3AED, #06B6D4, #10B981) 1 0 0 0;
       border-radius: 14px;
-      width: 500px;
+      width: 560px;
       max-width: 96vw;
-      max-height: 82vh;
+      max-height: 85vh;
       display: flex;
       flex-direction: column;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -485,6 +800,8 @@ function overlayCSS(): string {
       box-shadow: 0 32px 80px rgba(0,0,0,0.7), 0 0 0 1px #1e1b2e;
     }
 
+    .command-center .modal-body { gap: 10px; }
+
     .modal-header {
       display: flex;
       align-items: center;
@@ -492,6 +809,7 @@ function overlayCSS(): string {
       padding: 13px 16px 12px;
       border-bottom: 1px solid #1e1b2e;
       background: #0d0d14;
+      gap: 10px;
     }
 
     .modal-title {
@@ -501,30 +819,16 @@ function overlayCSS(): string {
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       letter-spacing: -0.2px;
+      flex-shrink: 0;
     }
 
-    .step-info {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 11px;
-      color: #6B7280;
+    .header-badge {
+      font-size: 10px;
+      color: #4B5563;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
     }
-
-    .step-dots {
-      display: flex;
-      gap: 4px;
-    }
-
-    .step-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: #374151;
-      transition: background 0.2s;
-    }
-
-    .step-dot.active { background: #7C3AED; }
 
     .close-btn {
       background: none;
@@ -536,11 +840,12 @@ function overlayCSS(): string {
       padding: 2px 6px;
       border-radius: 4px;
       transition: color 0.15s, background 0.15s;
+      flex-shrink: 0;
     }
     .close-btn:hover { color: #e2e8f0; background: #1e1b2e; }
 
     .modal-body {
-      padding: 16px;
+      padding: 14px 16px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
@@ -554,6 +859,234 @@ function overlayCSS(): string {
       min-height: 120px;
     }
 
+    /* ---- Sections ---- */
+
+    .section {
+      border: 1px solid #1e1b2e;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #0d0d14;
+    }
+
+    .section-header, .section-header-static {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 12px;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s;
+    }
+    .section-header:hover { background: #13131d; }
+    .section-header-static { cursor: default; padding-bottom: 4px; }
+
+    .section-icon { font-size: 13px; }
+    .section-label {
+      font-size: 10px;
+      color: #6B7280;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 600;
+      flex: 1;
+    }
+    .section-chevron {
+      font-size: 10px;
+      color: #4B5563;
+      transition: transform 0.2s;
+    }
+    .section-chevron.collapsed { transform: rotate(-90deg); }
+
+    .context-badge {
+      background: #7C3AED;
+      color: #fff;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 16px;
+      height: 16px;
+    }
+
+    .section-body {
+      padding: 0 12px 12px;
+    }
+
+    /* ---- Context Panel ---- */
+
+    .context-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+
+    .ctx-tab {
+      background: transparent;
+      border: 1px solid #1e1b2e;
+      color: #6B7280;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .ctx-tab:hover { border-color: #374151; color: #9CA3AF; }
+    .ctx-tab.active {
+      background: #1e1b2e;
+      border-color: #7C3AED55;
+      color: #e2e8f0;
+    }
+
+    .ctx-textarea {
+      width: 100%;
+      min-height: 80px;
+      max-height: 150px;
+      background: #0a0a12;
+      border: 1px solid #374151;
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: #e2e8f0;
+      font-size: 12px;
+      font-family: 'Fira Code', 'Cascadia Code', monospace;
+      line-height: 1.5;
+      outline: none;
+      resize: vertical;
+      transition: border-color 0.15s;
+    }
+    .ctx-textarea:focus { border-color: #7C3AED; box-shadow: 0 0 0 2px #7C3AED22; }
+
+    .ctx-input {
+      width: 100%;
+      background: #0a0a12;
+      border: 1px solid #374151;
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: #e2e8f0;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .ctx-input:focus { border-color: #7C3AED; box-shadow: 0 0 0 2px #7C3AED22; }
+
+    /* ---- Mode Grid ---- */
+
+    .mode-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 0 12px 12px;
+    }
+
+    .mode-btn {
+      background: #0a0a12;
+      border: 1px solid #1e1b2e;
+      color: #9CA3AF;
+      padding: 7px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .mode-btn:hover { border-color: #374151; color: #e2e8f0; background: #1e1b2e; }
+    .mode-btn.active {
+      background: linear-gradient(135deg, #7C3AED22, #06B6D422);
+      border-color: #7C3AED;
+      color: #fff;
+      font-weight: 600;
+    }
+
+    /* ---- Tool Grid ---- */
+
+    .tool-grid {
+      display: flex;
+      gap: 6px;
+      padding: 0 12px 12px;
+    }
+
+    .tool-btn {
+      background: #0a0a12;
+      border: 1px solid #1e1b2e;
+      color: #9CA3AF;
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.15s;
+      flex: 1;
+      text-align: center;
+    }
+    .tool-btn:hover { border-color: #374151; color: #e2e8f0; }
+    .tool-btn.active {
+      background: #06B6D418;
+      border-color: #06B6D4;
+      color: #06B6D4;
+      font-weight: 600;
+    }
+
+    /* ---- Presets ---- */
+
+    .presets-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 0 12px 12px;
+    }
+
+    .preset-chip {
+      background: #0a0a12;
+      border: 1px solid #1e1b2e;
+      color: #9CA3AF;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .preset-chip:hover {
+      background: #10B98118;
+      border-color: #10B981;
+      color: #10B981;
+      transform: translateY(-1px);
+    }
+
+    /* ---- Result Badges ---- */
+
+    .result-badges {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .result-badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .result-badge.purple { background: #7C3AED22; color: #a78bfa; border: 1px solid #7C3AED44; }
+    .result-badge.cyan   { background: #06B6D422; color: #67e8f9; border: 1px solid #06B6D444; }
+    .result-badge.green  { background: #10B98122; color: #6ee7b7; border: 1px solid #10B98144; }
+
+    .mode-badge-sm {
+      font-size: 9px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: #7C3AED22;
+      color: #a78bfa;
+      border: 1px solid #7C3AED44;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    /* ---- Common elements ---- */
+
     .label {
       font-size: 10px;
       color: #6B7280;
@@ -563,7 +1096,7 @@ function overlayCSS(): string {
     }
 
     .prompt-preview {
-      background: #0d0d14;
+      background: #0a0a12;
       border: 1px solid #1e1b2e;
       border-left: 3px solid #7C3AED;
       border-radius: 8px;
@@ -571,7 +1104,7 @@ function overlayCSS(): string {
       font-size: 12px;
       white-space: pre-wrap;
       word-break: break-word;
-      max-height: 100px;
+      max-height: 80px;
       overflow-y: auto;
       color: #a78bfa;
       font-family: 'Fira Code', 'Cascadia Code', monospace;
@@ -579,7 +1112,7 @@ function overlayCSS(): string {
     }
 
     .assembled-prompt {
-      background: #0d0d14;
+      background: #0a0a12;
       border: 1px solid #1e1b2e;
       border-left: 3px solid #10B981;
       border-radius: 8px;
@@ -587,7 +1120,7 @@ function overlayCSS(): string {
       font-size: 12px;
       white-space: pre-wrap;
       word-break: break-word;
-      max-height: 160px;
+      max-height: 200px;
       overflow-y: auto;
       color: #6ee7b7;
       font-family: 'Fira Code', 'Cascadia Code', monospace;
@@ -611,7 +1144,7 @@ function overlayCSS(): string {
 
     .answer-input {
       width: 100%;
-      background: #0d0d14;
+      background: #0a0a12;
       border: 1px solid #374151;
       border-radius: 8px;
       padding: 10px 12px;
@@ -621,6 +1154,57 @@ function overlayCSS(): string {
       transition: border-color 0.15s;
     }
     .answer-input:focus { border-color: #7C3AED; box-shadow: 0 0 0 2px #7C3AED22; }
+
+    .options-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 4px;
+      margin-bottom: 4px;
+    }
+
+    .option-pill {
+      background: #1e1b2e;
+      border: 1px solid #374151;
+      color: #e2e8f0;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .option-pill:hover {
+      background: #2d2847;
+      border-color: #7C3AED;
+      color: #fff;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    .step-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: #6B7280;
+    }
+
+    .step-dots {
+      display: flex;
+      gap: 4px;
+    }
+
+    .step-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #374151;
+      transition: background 0.2s;
+    }
+    .step-dot.active { background: #7C3AED; }
 
     .primary-btn {
       width: 100%;
@@ -637,6 +1221,12 @@ function overlayCSS(): string {
     }
     .primary-btn:hover { opacity: 0.9; }
     .primary-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .glow-btn {
+      box-shadow: 0 0 20px #7C3AED33, 0 0 40px #06B6D411;
+      transition: opacity 0.15s, box-shadow 0.3s;
+    }
+    .glow-btn:hover { box-shadow: 0 0 25px #7C3AED55, 0 0 50px #06B6D422; }
 
     .accent-btn {
       width: 100%;
@@ -744,5 +1334,4 @@ function overlayCSS(): string {
 const observer = new MutationObserver(() => injectButton());
 observer.observe(document.body, { childList: true, subtree: true });
 
-// Initial attempt after page settles
 setTimeout(injectButton, 2000);

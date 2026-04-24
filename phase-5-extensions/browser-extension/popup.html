@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PromptOS</title>
+  <title>PromptOS Copilot</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      width: 280px;
+      width: 300px;
       padding: 16px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       background: #0f0f17;
@@ -44,6 +44,27 @@
     }
 
     .instruction strong { color: #e2e8f0; }
+
+    .features {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    .feature-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #0d0d14;
+      border: 1px solid #1e1b2e;
+      border-radius: 8px;
+      padding: 7px 10px;
+      font-size: 11px;
+      color: #9CA3AF;
+    }
+
+    .feature-icon { font-size: 13px; }
 
     .sites {
       display: flex;
@@ -97,14 +118,22 @@
   </style>
 </head>
 <body>
-  <div class="logo">⚡ PromptOS</div>
-  <div class="tagline">prompt refinement layer</div>
+  <div class="logo">⚡ PromptOS Copilot</div>
+  <div class="tagline">your AI coding companion</div>
   <div class="divider"></div>
 
   <p class="instruction">
     Navigate to a supported site — the
-    <strong>"Enhance with PromptOS"</strong> button will appear automatically below the chat input.
+    <strong>"⚡ PromptOS Copilot"</strong> button will appear below the chat input.
   </p>
+
+  <div class="features">
+    <div class="feature-chip"><span class="feature-icon">🐛</span> Bug Fix · Debug errors fast</div>
+    <div class="feature-chip"><span class="feature-icon">✨</span> Feature · Build something new</div>
+    <div class="feature-chip"><span class="feature-icon">♻️</span> Refactor · Clean up code</div>
+    <div class="feature-chip"><span class="feature-icon">🔍</span> Review · Code review help</div>
+    <div class="feature-chip"><span class="feature-icon">📖</span> Learn · Instant explanations</div>
+  </div>
 
   <div class="sites">
     <div class="site-chip"><span class="site-dot"></span>claude.ai</div>

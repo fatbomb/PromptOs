@@ -25,41 +25,71 @@ interface Scores {
 
 // ── Design tokens ──────────────────────────────────────────────────────────
 const C = {
-  primary:   '#7C3AED',
-  secondary: '#06B6D4',
-  accent:    '#10B981',
+  primary:   'var(--vscode-button-background)',
+  primaryHover: 'var(--vscode-button-hoverBackground)',
+  secondary: 'var(--vscode-textLink-foreground, #4EA1FF)',
+  accent:    'var(--vscode-testing-iconPassed, #4CAF50)',
   warning:   '#F59E0B',
   danger:    '#EF4444',
-  muted:     '#6B7280',
+  muted:     'var(--vscode-descriptionForeground, #9AA0A6)',
   surface:   'var(--vscode-input-background)',
+  panel:     'var(--vscode-editorWidget-background, var(--vscode-sideBar-background))',
   border:    'var(--vscode-input-border, #313244)',
   text:      'var(--vscode-editor-foreground)',
+  btnText:   'var(--vscode-button-foreground)',
   font:      'var(--vscode-font-family)',
 };
 
 const S: Record<string, React.CSSProperties> = {
   root: {
-    padding: '14px 12px',
+    padding: '12px',
     fontFamily: C.font,
     color: C.text,
     fontSize: 13,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 10,
     minHeight: '100vh',
     boxSizing: 'border-box',
+    background: 'var(--vscode-sideBar-background)',
+  },
+  shell: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+    maxWidth: 360,
+    margin: '0 auto',
+    background: C.panel,
+    border: `1px solid ${C.border}`,
+    borderRadius: 12,
+    padding: 12,
   },
   logo: {
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: 700,
-    background: 'linear-gradient(90deg, #7C3AED, #06B6D4, #10B981)',
-    WebkitBackgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
-    letterSpacing: '-0.3px',
+    color: C.text,
+    letterSpacing: '-0.02em',
   },
   divider: {
     height: 1,
-    background: 'linear-gradient(90deg, #7C3AED44, #06B6D444, transparent)',
+    background: 'var(--vscode-panel-border, var(--vscode-input-border, #313244))',
+  },
+  sectionTitle: {
+    fontSize: 11,
+    color: C.muted,
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+    fontWeight: 600,
+  },
+  progressTrack: {
+    width: '100%',
+    height: 6,
+    borderRadius: 999,
+    background: 'var(--vscode-scrollbarSlider-background, rgba(122,122,122,0.2))',
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 999,
+    background: C.primary,
+    transition: 'width 160ms ease',
   },
   textarea: {
     width: '100%',
@@ -67,13 +97,14 @@ const S: Record<string, React.CSSProperties> = {
     background: C.surface,
     color: C.text,
     border: `1px solid ${C.border}`,
-    borderRadius: 8,
-    padding: '8px 10px',
-    fontSize: 12,
+    borderRadius: 10,
+    padding: '10px 12px',
+    fontSize: 13,
     fontFamily: C.font,
     resize: 'vertical' as const,
     outline: 'none',
     lineHeight: 1.5,
+    minHeight: 104,
   },
   input: {
     width: '100%',
@@ -81,61 +112,62 @@ const S: Record<string, React.CSSProperties> = {
     background: C.surface,
     color: C.text,
     border: `1px solid ${C.border}`,
-    borderRadius: 8,
-    padding: '8px 10px',
+    borderRadius: 10,
+    padding: '10px 12px',
     fontSize: 13,
     fontFamily: C.font,
     outline: 'none',
   },
   btnPrimary: {
     width: '100%',
-    padding: '9px 0',
-    background: 'linear-gradient(90deg, #7C3AED, #06B6D4)',
-    color: '#fff',
+    padding: '10px 12px',
+    background: C.primary,
+    color: C.btnText,
     border: 'none',
-    borderRadius: 8,
+    borderRadius: 10,
     fontSize: 13,
     fontWeight: 600,
     cursor: 'pointer',
+    textAlign: 'center',
   },
   btnSecondary: {
     width: '100%',
-    padding: '7px 0',
+    padding: '9px 12px',
     background: 'transparent',
-    color: C.secondary,
+    color: C.text,
     border: `1px solid ${C.border}`,
-    borderRadius: 8,
+    borderRadius: 10,
     fontSize: 12,
     cursor: 'pointer',
   },
   btnAccent: {
     width: '100%',
     padding: '9px 0',
-    background: 'linear-gradient(90deg, #10B981, #06B6D4)',
-    color: '#fff',
+    background: C.primary,
+    color: C.btnText,
     border: 'none',
-    borderRadius: 8,
+    borderRadius: 10,
     fontSize: 13,
     fontWeight: 600,
     cursor: 'pointer',
   },
   card: {
-    background: C.surface,
+    background: 'var(--vscode-editor-background)',
     border: `1px solid ${C.border}`,
-    borderRadius: 8,
-    padding: '10px 12px',
+    borderRadius: 10,
+    padding: '12px',
   },
   pre: {
-    fontSize: 11,
+    fontSize: 12,
     background: C.surface,
     border: `1px solid ${C.border}`,
-    borderRadius: 8,
-    padding: '10px 12px',
+    borderRadius: 10,
+    padding: '12px',
     whiteSpace: 'pre-wrap' as const,
     wordBreak: 'break-word' as const,
-    maxHeight: 180,
+    maxHeight: 220,
     overflow: 'auto',
-    color: '#10B981',
+    color: C.text,
     fontFamily: "'Fira Code', 'Cascadia Code', monospace",
     lineHeight: 1.5,
     margin: 0,
@@ -164,27 +196,13 @@ function ScoreRow({ label, value }: { label: string; value: number }) {
   );
 }
 
-function StepDots({ current, total }: { current: number; total: number }) {
-  return (
-    <div style={{ display: 'flex', gap: 4 }}>
-      {Array.from({ length: total }, (_, i) => (
-        <span key={i} style={{
-          width: 6, height: 6, borderRadius: '50%',
-          background: i < current ? C.primary : C.muted,
-          display: 'inline-block',
-        }} />
-      ))}
-    </div>
-  );
-}
-
 function Spinner({ text = 'Thinking...' }: { text?: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: C.secondary, fontSize: 12 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: C.muted, fontSize: 12 }}>
       <span style={{
         width: 14, height: 14,
         border: `2px solid ${C.border}`,
-        borderTopColor: C.secondary,
+        borderTopColor: C.primary,
         borderRadius: '50%',
         display: 'inline-block',
         animation: 'spin 0.7s linear infinite',
@@ -207,12 +225,12 @@ export default function App() {
   const [refuseMsg, setRefuseMsg] = useState('');
   const [copied, setCopied]       = useState(false);
   const [error, setError]         = useState('');
+  const [repeatHint, setRepeatHint] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const inputRef   = useRef<HTMLInputElement>(null);
   const sessionRef = useRef<string | null>(null);
-  const turnRef    = useRef<number>(1);
-
-  useEffect(() => { turnRef.current = turnNum; }, [turnNum]);
+  const lastQuestionRef = useRef('');
 
   // Stable message handler
   useEffect(() => {
@@ -241,11 +259,13 @@ export default function App() {
 
         case 'sessionStarted':
           sessionRef.current = msg.sessionId;
+          setIsSubmitting(false);
           setPhase('loading');
           vscode?.postMessage({ type: 'sendMessage', sessionId: msg.sessionId, userMessage: '_init_' });
           break;
 
         case 'messageResponse':
+          setIsSubmitting(false);
           if (msg.done) {
             if (msg.should_refuse) {
               setRefuseMsg(msg.message ?? 'You already know the answer. Try implementing it.');
@@ -257,14 +277,35 @@ export default function App() {
               vscode?.postMessage({ type: 'completeSession', sessionId: sessionRef.current });
             }
           } else {
-            setQuestion(msg.question);
-            setTurnNum((msg.turn as number) ?? (turnRef.current + 1));
+            const nextQuestion = String(msg.question ?? '').trim();
+            const hasTurn = typeof msg.turn === 'number' && Number.isFinite(msg.turn);
+            const normalizedTurn = hasTurn ? Math.max(1, Math.min(4, Number(msg.turn))) : null;
+            const hadPreviousQuestion = Boolean(lastQuestionRef.current);
+            const isRepeat = nextQuestion.length > 0 && nextQuestion === lastQuestionRef.current;
+
+            if (nextQuestion) {
+              setQuestion(nextQuestion);
+              lastQuestionRef.current = nextQuestion;
+            }
+
+            if (normalizedTurn !== null) {
+              setTurnNum(normalizedTurn);
+            } else {
+              setTurnNum((prev) => {
+                if (!hadPreviousQuestion) return 1;
+                if (isRepeat) return prev;
+                return Math.min(4, prev + 1);
+              });
+            }
+
+            setRepeatHint(isRepeat ? 'Looks like this still needs more detail. Short answers are fine, and “not sure” is okay.' : '');
             setPhase('asking');
             setTimeout(() => inputRef.current?.focus(), 80);
           }
           break;
 
         case 'sessionError':
+          setIsSubmitting(false);
           setError(msg.error ?? 'Something went wrong');
           setPhase('idle');
           break;
@@ -276,14 +317,20 @@ export default function App() {
   }, []);
 
   const handleStart = () => {
-    if (!rawPrompt.trim()) return;
+    if (!rawPrompt.trim() || isSubmitting) return;
+    setIsSubmitting(true);
     setError('');
+    setRepeatHint('');
+    setQuestion('');
+    lastQuestionRef.current = '';
+    setTurnNum(1);
     setPhase('loading');
     vscode?.postMessage({ type: 'startSession', rawPrompt: rawPrompt.trim() });
   };
 
   const handleAnswer = () => {
-    if (!answer.trim() || !sessionRef.current) return;
+    if (!answer.trim() || !sessionRef.current || isSubmitting) return;
+    setIsSubmitting(true);
     const a = answer.trim();
     setAnswer('');
     setPhase('loading');
@@ -297,17 +344,26 @@ export default function App() {
     setScores(null);
     sessionRef.current = null;
     setTurnNum(1);
+    setQuestion('');
+    setAnswer('');
+    setRepeatHint('');
+    setIsSubmitting(false);
+    lastQuestionRef.current = '';
     setCopied(false);
     setError('');
   };
 
+  const progress = Math.max(1, Math.min(turnNum, 4));
+  const progressPct = `${(progress / 4) * 100}%`;
+
   return (
     <div style={S.root}>
+      <div style={S.shell}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div style={S.logo}>⚡ PromptOS</div>
-          <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>prompt refinement layer</div>
+          <div style={S.logo}>PromptOS</div>
+          <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Prompt refinement assistant</div>
         </div>
         {phase !== 'login' && phase !== 'loginPolling' && phase !== 'loginTimeout' && (
           <button
@@ -324,31 +380,32 @@ export default function App() {
       {/* ── LOGIN ── */}
       {phase === 'login' && (
         <>
-          <div style={{ ...S.card, textAlign: 'center', padding: '20px 16px' }}>
-            <div style={{ fontSize: 28, marginBottom: 8 }}>🔐</div>
-            <p style={{ margin: '0 0 6px', fontWeight: 600, fontSize: 13 }}>Sign in to PromptOS</p>
+          <div style={{ ...S.card, textAlign: 'left' }}>
+            <div style={S.sectionTitle}>Account</div>
+            <p style={{ margin: '8px 0 6px', fontWeight: 600, fontSize: 14 }}>Sign in to continue</p>
             <p style={{ margin: '0 0 16px', fontSize: 11, color: C.muted, lineHeight: 1.5 }}>
-              Login via the dashboard to connect your account
+              Connect your PromptOS account once, then refine prompts directly from the sidebar.
             </p>
             <button
               onClick={() => vscode?.postMessage({ type: 'login' })}
-              style={S.btnPrimary}
+              style={{ ...S.btnPrimary, opacity: isSubmitting ? 0.8 : 1 }}
+              disabled={isSubmitting}
             >
-              Login with Google →
+              Continue with Google
             </button>
           </div>
-          <div style={{ fontSize: 10, color: C.muted, textAlign: 'center' }}>
-            Opens browser → login → auto-connects
+          <div style={{ fontSize: 11, color: C.muted }}>
+            Opens your browser and returns automatically after sign-in.
           </div>
         </>
       )}
 
       {/* ── LOGIN POLLING ── */}
       {phase === 'loginPolling' && (
-        <div style={{ ...S.card, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: 24 }}>
+        <div style={{ ...S.card, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: 20 }}>
           <Spinner text="Waiting for login..." />
           <p style={{ fontSize: 11, color: C.muted, margin: 0, textAlign: 'center' }}>
-            Complete login in your browser — this will auto-connect
+            Complete sign-in in the browser tab to continue.
           </p>
         </div>
       )}
@@ -357,11 +414,11 @@ export default function App() {
       {phase === 'loginTimeout' && (
         <>
           <div style={{ ...S.card, borderLeft: `3px solid ${C.warning}` }}>
-            <p style={{ margin: 0, fontSize: 12, color: C.warning, fontWeight: 600 }}>Login timed out</p>
-            <p style={{ margin: '4px 0 0', fontSize: 11, color: C.muted }}>Please try again</p>
+            <p style={{ margin: 0, fontSize: 12, color: C.warning, fontWeight: 600 }}>Sign-in timed out</p>
+            <p style={{ margin: '4px 0 0', fontSize: 11, color: C.muted }}>Please try once more.</p>
           </div>
           <button onClick={() => vscode?.postMessage({ type: 'login' })} style={S.btnPrimary}>
-            Try again →
+            Try again
           </button>
         </>
       )}
@@ -376,15 +433,20 @@ export default function App() {
           )}
           <div style={S.label}>Your raw prompt</div>
           <textarea
-            placeholder="Paste your vague prompt here..."
+            placeholder="Describe what you want help with..."
             value={rawPrompt}
             onChange={(e) => setRawPrompt(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && e.metaKey && handleStart()}
             rows={5}
             style={S.textarea}
           />
+          <div style={{ ...S.card, padding: '10px 12px' }}>
+            <div style={{ fontSize: 11, color: C.muted, lineHeight: 1.5 }}>
+              You’ll get up to 4 short clarification questions before we assemble your final prompt.
+            </div>
+          </div>
           <button onClick={handleStart} style={S.btnPrimary} disabled={!rawPrompt.trim()}>
-            Start Refinement →
+            Start refinement
           </button>
           <div style={{ fontSize: 10, color: C.muted, textAlign: 'center' }}>⌘↵ to start</div>
         </>
@@ -400,23 +462,41 @@ export default function App() {
       {/* ── ASKING ── */}
       {phase === 'asking' && (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 11, color: C.muted }}>Question {turnNum} of ~4</span>
-            <StepDots current={turnNum} total={4} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+            <span style={{ fontSize: 11, color: C.muted, whiteSpace: 'nowrap' }}>Step {progress} of 4</span>
+            <div style={S.progressTrack}>
+              <div style={{ ...S.progressFill, width: progressPct }} />
+            </div>
           </div>
           <div style={{ ...S.card, borderLeft: `3px solid ${C.primary}` }}>
-            <p style={{ margin: 0, fontWeight: 600, fontSize: 13, lineHeight: 1.5 }}>{question}</p>
+            <div style={S.sectionTitle}>Question</div>
+            <p style={{ margin: '8px 0 0', fontWeight: 600, fontSize: 14, lineHeight: 1.5 }}>{question}</p>
           </div>
+          <div style={{ fontSize: 11, color: C.muted }}>
+            Keep it short. If you’re unsure, say “not sure”.
+          </div>
+          {repeatHint && (
+            <div style={{ ...S.card, borderLeft: `3px solid ${C.warning}`, padding: '8px 10px' }}>
+              <p style={{ margin: 0, fontSize: 11, color: C.warning }}>{repeatHint}</p>
+            </div>
+          )}
           <input
             ref={inputRef}
             value={answer}
             onChange={(e) => setAnswer(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAnswer()}
-            placeholder="Your answer... (Enter to submit)"
+            placeholder="Your answer"
             style={S.input}
           />
-          <button onClick={handleAnswer} style={S.btnPrimary} disabled={!answer.trim()}>
-            Submit →
+          <button onClick={handleAnswer} style={S.btnPrimary} disabled={!answer.trim() || isSubmitting}>
+            Submit
+          </button>
+          <button
+            onClick={() => setAnswer('not sure')}
+            style={S.btnSecondary}
+            disabled={isSubmitting}
+          >
+            I’m not sure
           </button>
         </>
       )}
@@ -425,7 +505,7 @@ export default function App() {
       {phase === 'refused' && (
         <>
           <div style={{ ...S.card, borderLeft: `3px solid ${C.warning}`, background: `${C.warning}11` }}>
-            <p style={{ margin: 0, fontWeight: 700, fontSize: 13, color: C.warning }}>🚫 Refusal Engine</p>
+            <p style={{ margin: 0, fontWeight: 700, fontSize: 13, color: C.warning }}>Prompt guidance</p>
             <p style={{ margin: '6px 0 0', fontSize: 12, color: C.text, lineHeight: 1.5 }}>{refuseMsg}</p>
           </div>
           <button onClick={reset} style={S.btnSecondary}>Start over</button>
@@ -435,7 +515,10 @@ export default function App() {
       {/* ── COMPLETE ── */}
       {phase === 'complete' && (
         <>
-          <div style={{ fontSize: 11, color: C.accent, fontWeight: 600 }}>✦ Assembled Prompt</div>
+          <div style={{ ...S.card, padding: '10px 12px' }}>
+            <div style={S.sectionTitle}>Result</div>
+            <div style={{ fontSize: 14, fontWeight: 600, marginTop: 6 }}>Assembled prompt</div>
+          </div>
           <pre style={S.pre}>{assembled}</pre>
           {scores && (
             <div style={{ ...S.card, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -448,7 +531,7 @@ export default function App() {
             </div>
           )}
           <button onClick={() => { vscode?.postMessage({ type: 'sendToTerminal', assembledPrompt: assembled }); setPhase('sent'); }} style={S.btnAccent}>
-            Send to Claude Code →
+            Send to Claude Code
           </button>
           <button onClick={() => { navigator.clipboard?.writeText(assembled); setCopied(true); setTimeout(() => setCopied(false), 2000); }} style={S.btnSecondary}>
             {copied ? '✓ Copied!' : 'Copy to clipboard'}
@@ -461,13 +544,13 @@ export default function App() {
 
       {/* ── SENT ── */}
       {phase === 'sent' && (
-        <div style={{ textAlign: 'center', padding: '24px 0' }}>
-          <div style={{ fontSize: 28, marginBottom: 8 }}>🚀</div>
-          <p style={{ margin: '0 0 4px', fontWeight: 600, color: C.accent }}>Prompt sent!</p>
+        <div style={{ ...S.card, textAlign: 'center', padding: '20px 12px' }}>
+          <p style={{ margin: '0 0 4px', fontWeight: 600, color: C.accent, fontSize: 14 }}>Prompt sent</p>
           <p style={{ margin: '0 0 16px', fontSize: 11, color: C.muted }}>Check your terminal</p>
           <button onClick={reset} style={S.btnSecondary}>New session</button>
         </div>
       )}
+      </div>
     </div>
   );
 }

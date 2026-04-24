@@ -35,6 +35,7 @@ def get_client():
 _BASE_RULES = """\
 Rules:
 - Ask ONE question per turn. Never two.
+- Always provide 2-4 short, likely options to help the user answer quickly when asking a question. Include a fallback option like "Not sure".
 - Before asking, check workspace_context — skip any question whose answer is already visible (open files, error traces, cursor position).
 - Prioritise questions by information density: prefer questions that unlock the most context if unanswered.
 - Question priority order:
@@ -52,7 +53,7 @@ SYSTEM_PROMPT = f"""You are an expert prompt refinement agent. Your goal is to g
 Given the developer's raw prompt and conversation so far, output ONLY valid JSON.
 
 If more context is needed (follow the priority order in Rules):
-{{"question": "What exact error message or stack trace are you seeing?", "why": "Error text is the single highest-signal piece of context for a bug", "done": false}}
+{{"question": "What exact error message or stack trace are you seeing?", "options": ["TypeError in console", "Build fails", "Wrong output", "Not sure"], "why": "Error text is the single highest-signal piece of context for a bug", "done": false}}
 
 Once you have enough to fully specify the problem (after 3-6 questions), assemble using this structure inside assembled_prompt:
 
@@ -97,7 +98,7 @@ SYSTEM_PROMPT_GEMINI = f"""You are an expert prompt refinement agent that produc
 Given the developer's raw prompt and conversation so far, output ONLY valid JSON.
 
 If more context is needed (follow the priority order in Rules):
-{{"question": "What exact error message or stack trace are you seeing?", "why": "Error text is the single highest-signal piece of context for a bug", "done": false}}
+{{"question": "What exact error message or stack trace are you seeing?", "options": ["TypeError in console", "Build fails", "Wrong output", "Not sure"], "why": "Error text is the single highest-signal piece of context for a bug", "done": false}}
 
 When assembling, produce a Gemini-optimised prompt using this structure inside assembled_prompt:
 <task>[One-sentence description: verb + component + outcome]</task>
@@ -129,7 +130,7 @@ SYSTEM_PROMPT_CLAUDE = f"""You are an expert prompt refinement agent that produc
 Given the developer's raw prompt and conversation so far, output ONLY valid JSON.
 
 If more context is needed (follow the priority order in Rules):
-{{"question": "What exact error message or stack trace are you seeing?", "why": "Error text is the single highest-signal piece of context for a bug", "done": false}}
+{{"question": "What exact error message or stack trace are you seeing?", "options": ["TypeError in console", "Build fails", "Wrong output", "Not sure"], "why": "Error text is the single highest-signal piece of context for a bug", "done": false}}
 
 When assembling, produce a Claude-optimised prompt with this natural markdown layout inside assembled_prompt:
 ## Task

@@ -46,10 +46,9 @@ export class PromptosSidebarProvider implements vscode.WebviewViewProvider {
 
         // ── Login — open browser + poll for JWT ──────────────────────────
         case 'login': {
-          const bytes = new Uint8Array(16);
           // Use vscode's built-in randomness via a simple timestamp+random combo
           const state = Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
-          const loginUrl = `${this._dashboardBase}/auth/login?state=${state}`;
+          const loginUrl = `${this._dashboardBase}/login?state=${state}`;
           await vscode.env.openExternal(vscode.Uri.parse(loginUrl));
 
           // Poll every 2s for up to 60s
