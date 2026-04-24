@@ -39,3 +39,14 @@ async def get_cli_token(state: str):
     if not token:
         raise HTTPException(status_code=404, detail="Token not ready yet")
     return {"token": token}
+
+
+from middleware.jwt_verify import get_current_user
+from fastapi import Depends
+
+@router.get("/verify")
+async def verify_token(user=Depends(get_current_user)):
+    """
+    Verifies the given JWT token is still valid.
+    """
+    return {"valid": True, "user_id": user["sub"]}

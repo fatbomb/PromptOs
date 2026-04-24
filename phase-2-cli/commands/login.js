@@ -9,7 +9,7 @@
 import open from 'open';
 import chalk from 'chalk';
 import crypto from 'crypto';
-import { saveToken } from '../utils/auth.js';
+import { saveToken, getToken, deleteToken } from '../utils/auth.js';
 import {
   printCompactBanner,
   printPanel,
@@ -25,6 +25,30 @@ const DASHBOARD_URL = process.env.PROMPTOS_DASHBOARD_URL || 'http://localhost:30
 
 export async function loginCommand() {
   printCompactBanner('login');
+
+  // Check if user is already logged in
+  const existingToken = await getToken();
+  if (existingToken) {
+    const verifySpinner = createSpinner('Checking existing session…').start();
+    try {
+      const verifyRes = await fetch(`${API}/auth/verify`, {
+        headers: { Authorization: `Bearer ${existingToken}` }
+      });
+      verifySpinner.stop();
+      if (verifyRes.ok) {
+        printSuccess('You are already logged in to PromptOS!');
+        printDim('Run `promptos stats` to see your usage stats.');
+        return;
+      } else {
+        // Token is invalid, clean it up and proceed to login
+        await deleteToken();
+      }
+    } catch (e) {
+      verifySpinner.stop();
+      // If backend is unreachable, we'll just ignore and proceed to try login (which will fail later)
+      // or we can abort. Let's proceed to login so the user gets the standard error if backend is down.
+    }
+  }
 
   const state    = crypto.randomBytes(16).toString('hex');
   const loginUrl = `${DASHBOARD_URL}/login?state=${state}`;

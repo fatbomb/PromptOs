@@ -11,6 +11,7 @@ import { logoutCommand } from './commands/logout.js';
 import { statsCommand } from './commands/stats.js';
 import { runCommand } from './commands/run.js';
 import { devLoginCommand } from './commands/dev-login.js';
+import { shellCommand } from './commands/shell.js';
 
 program
   .name('promptos')
@@ -20,6 +21,11 @@ program
   .option('-m, --mid', 'Quick mode: at most 3 clarifying questions, then auto-format')
   .showHelpAfterError('(Run "promptos --help" to see a list of all available commands)')
   .showSuggestionAfterError();
+
+// ── Default action: launch interactive shell when no subcommand is given ──
+program.action(() => {
+  shellCommand();
+});
 
 program
   .command('ask [prompt...]')

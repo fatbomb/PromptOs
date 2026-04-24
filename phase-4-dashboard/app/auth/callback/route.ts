@@ -62,6 +62,8 @@ export async function GET(request: NextRequest) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ state, token: data.session.access_token }),
     }).catch(() => {}); // Non-blocking — CLI polling will retry
+    
+    return NextResponse.redirect(new URL('/dashboard?cli_login=success', request.url));
   }
 
   return NextResponse.redirect(new URL('/dashboard', request.url));

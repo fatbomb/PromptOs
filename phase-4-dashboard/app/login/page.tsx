@@ -23,6 +23,27 @@ function LoginForm() {
   ), []);
 
   useEffect(() => {
+    // Check if user is already logged in
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        if (state) {
+          // Hand off token to CLI
+          const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+          await fetch(`${apiBase}/auth/cli-token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ state, token: session.access_token }),
+          }).catch(() => {});
+          
+          router.push('/dashboard?cli_login=success');
+        } else {
+          router.push('/dashboard');
+        }
+      }
+    };
+    checkSession();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_IN') {
         router.refresh();
@@ -30,7 +51,7 @@ function LoginForm() {
     });
 
     return () => subscription.unsubscribe();
-  }, [supabase, router]);
+  }, [supabase, router, state]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,10 +101,13 @@ function LoginForm() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ state, token: data.session.access_token }),
             }).catch(() => {});
+            
+            router.refresh();
+            router.push('/dashboard?cli_login=success');
+          } else {
+            router.refresh();
+            router.push('/dashboard');
           }
-
-          router.refresh();
-          router.push('/dashboard');
         }
       }
     } catch (err: any) {

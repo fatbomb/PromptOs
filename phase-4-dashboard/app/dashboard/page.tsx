@@ -4,6 +4,7 @@ import MetricCard from '@/components/MetricCard';
 import SessionTable from '@/components/SessionTable';
 import WeeklyTrendChart from '@/components/WeeklyTrendChart';
 import ExtensionSync from '@/components/ExtensionSync';
+import CLILoginToast from '@/components/CLILoginToast';
 
 export default async function DashboardPage() {
   const cookieStore = cookies();
@@ -49,6 +50,7 @@ export default async function DashboardPage() {
 
   return (
     <main className="relative min-h-screen bg-[var(--bg-color)] text-[var(--text-primary)] p-6 md:p-12 overflow-hidden font-sans transition-colors duration-300">
+      <CLILoginToast />
       <ExtensionSync />
       {/* Dynamic Background Glows */}
       <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] rounded-full bg-blue-600/10 blur-[120px] pointer-events-none"></div>
