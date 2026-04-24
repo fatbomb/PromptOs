@@ -7,8 +7,8 @@ then upserts them into the `concept_map` Supabase table.
 """
 
 import json
-
 from google import genai
+from services.supabase_client import upsert_concept_db
 
 EXTRACT_PROMPT = """Extract the core programming/engineering concepts from this prompt.
 Output ONLY a JSON array of short concept strings (2–4 words max each).
@@ -53,15 +53,7 @@ async def extract_and_store_concepts(
 
     for concept in concepts:
         color_band = _score_to_color(dependency_score)
-        # TODO (Task 3.2): upsert concept into Supabase `concept_map`
-        # supabase.table("concept_map").upsert({
-        #     "user_id": user_id,
-        #     "concept": concept,
-        #     "encounter_count": 1,   # increment via RPC
-        #     "avg_score": dependency_score,
-        #     "color_band": color_band,
-        #     "last_seen_at": "now()",
-        # }, on_conflict="user_id,concept").execute()
+        upsert_concept_db(user_id, concept, dependency_score, color_band)
         print(f"[concept_extractor] session={session_id} concept={concept!r} band={color_band}")
 
 

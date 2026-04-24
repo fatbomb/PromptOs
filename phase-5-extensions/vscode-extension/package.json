@@ -3,9 +3,15 @@
   "displayName": "PromptOS",
   "description": "Prompt refinement for AI coding assistants — right in your editor",
   "version": "0.1.0",
-  "engines": { "vscode": "^1.77.0" },
-  "categories": ["Other"],
-  "activationEvents": ["onStartupFinished"],
+  "engines": {
+    "vscode": "^1.77.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "viewsContainers": {
@@ -19,7 +25,11 @@
     },
     "views": {
       "promptos": [
-        { "type": "webview", "id": "promptos.sidebar", "name": "Refine Prompt" }
+        {
+          "type": "webview",
+          "id": "promptos.sidebar",
+          "name": "Refine Prompt"
+        }
       ]
     },
     "commands": [
@@ -38,12 +48,12 @@
     "@google/generative-ai": "^0.11.0"
   },
   "devDependencies": {
-    "@types/vscode": "^1.77.0",
     "@types/react": "^18",
     "@types/react-dom": "^18",
-    "typescript": "^5",
-    "esbuild": "^0.21.0",
+    "@types/vscode": "^1.77.0",
+    "esbuild": "^0.28.0",
     "react": "^18",
-    "react-dom": "^18"
+    "react-dom": "^18",
+    "typescript": "^5"
   }
 }

@@ -15,6 +15,7 @@ from middleware.jwt_verify import get_current_user
 from services.gemini import run_conversation_turn
 from services.scoring import compute_scores
 from services.concept_extractor import extract_and_store_concepts
+from services.supabase_client import store_session_db, update_weekly_aggregates
 
 router = APIRouter()
 
@@ -128,7 +129,10 @@ async def complete_session(
         raise HTTPException(status_code=404, detail="Session not found")
 
 
-    # TODO (Task 3.2): persist session row to Supabase `sessions` table
+    # Task 1.4 & 3.2 — Persist session row to Supabase
+    if session.get("assembled_prompt"):
+        store_session_db(session)
+        update_weekly_aggregates(session["user_id"], session.get("scores", {}))
 
     # Background: extract concepts and update concept_map (Task 3.2)
     if session.get("assembled_prompt"):
