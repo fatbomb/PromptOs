@@ -81,6 +81,19 @@
     }
 
     .status span { color: #7C3AED; }
+
+    .login-btn {
+      display: block;
+      text-align: center;
+      padding: 8px;
+      background: linear-gradient(90deg, #7C3AED, #06B6D4);
+      color: #fff;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
   </style>
 </head>
 <body>
@@ -97,6 +110,8 @@
     <div class="site-chip"><span class="site-dot"></span>claude.ai</div>
     <div class="site-chip"><span class="site-dot"></span>chat.openai.com</div>
   </div>
+
+  <a href="http://localhost:3000/auth/login" target="_blank" class="login-btn">Login / Dashboard →</a>
 
   <div class="status">Backend: <span>localhost:8000</span></div>
 </body>

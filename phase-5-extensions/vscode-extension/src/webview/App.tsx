@@ -1,10 +1,11 @@
 /**
  * VS Code Webview React App — Phase 5, Task 5.3
  *
- * Refined UI matching the PromptOS design system:
- * violet / cyan / emerald palette, consistent with CLI ui.js
+ * State machine:
+ *   login → loginPolling → idle → loading → asking → complete → sent | refused
  *
- * State machine: idle → loading → asking → complete → sent | refused
+ * Auth: sends 'ready' on mount, receives 'authState' from host.
+ * If not logged in → shows login screen.
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -13,7 +14,7 @@ import { createRoot } from 'react-dom/client';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const vscode = (window as any).acquireVsCodeApi?.();
 
-type Phase = 'idle' | 'loading' | 'asking' | 'refused' | 'complete' | 'sent';
+type Phase = 'login' | 'loginPolling' | 'loginTimeout' | 'idle' | 'loading' | 'asking' | 'refused' | 'complete' | 'sent';
 
 interface Scores {
   token_efficiency_score: number;
@@ -22,7 +23,7 @@ interface Scores {
   estimated_turns_saved: number;
 }
 
-// ── Design tokens (matches ui.js palette) ──────────────────────────────────
+// ── Design tokens ──────────────────────────────────────────────────────────
 const C = {
   primary:   '#7C3AED',
   secondary: '#06B6D4',
@@ -30,15 +31,12 @@ const C = {
   warning:   '#F59E0B',
   danger:    '#EF4444',
   muted:     '#6B7280',
-  bg:        'var(--vscode-editor-background)',
   surface:   'var(--vscode-input-background)',
   border:    'var(--vscode-input-border, #313244)',
   text:      'var(--vscode-editor-foreground)',
-  textDim:   'var(--vscode-descriptionForeground)',
   font:      'var(--vscode-font-family)',
 };
 
-// ── Shared styles ──────────────────────────────────────────────────────────
 const S: Record<string, React.CSSProperties> = {
   root: {
     padding: '14px 12px',
@@ -51,12 +49,6 @@ const S: Record<string, React.CSSProperties> = {
     minHeight: '100vh',
     boxSizing: 'border-box',
   },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 2,
-  },
   logo: {
     fontSize: 15,
     fontWeight: 700,
@@ -65,10 +57,9 @@ const S: Record<string, React.CSSProperties> = {
     WebkitTextFillColor: 'transparent',
     letterSpacing: '-0.3px',
   },
-  version: {
-    fontSize: 10,
-    color: C.muted,
-    marginTop: 2,
+  divider: {
+    height: 1,
+    background: 'linear-gradient(90deg, #7C3AED44, #06B6D444, transparent)',
   },
   textarea: {
     width: '100%',
@@ -106,7 +97,6 @@ const S: Record<string, React.CSSProperties> = {
     fontSize: 13,
     fontWeight: 600,
     cursor: 'pointer',
-    letterSpacing: '0.2px',
   },
   btnSecondary: {
     width: '100%',
@@ -157,14 +147,8 @@ const S: Record<string, React.CSSProperties> = {
     letterSpacing: '0.08em',
     fontWeight: 600,
   },
-  stepDots: {
-    display: 'flex',
-    gap: 4,
-    alignItems: 'center',
-  },
 };
 
-// ── Score bar ──────────────────────────────────────────────────────────────
 function ScoreRow({ label, value }: { label: string; value: number }) {
   const color = value >= 75 ? C.accent : value >= 40 ? C.warning : C.danger;
   const filled = Math.round((value / 100) * 16);
@@ -172,40 +156,40 @@ function ScoreRow({ label, value }: { label: string; value: number }) {
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11 }}>
       <span style={{ color: C.muted, width: 110, flexShrink: 0 }}>{label}</span>
       <span style={{ color, fontWeight: 700, width: 28 }}>{value}</span>
-      <span style={{ fontFamily: 'monospace', fontSize: 10, color: C.muted, letterSpacing: -1 }}>
-        <span style={{ color }}>{'█'.repeat(filled)}</span>{'░'.repeat(16 - filled)}
+      <span style={{ fontFamily: 'monospace', fontSize: 10, letterSpacing: -1 }}>
+        <span style={{ color }}>{'█'.repeat(filled)}</span>
+        <span style={{ color: C.muted }}>{'░'.repeat(16 - filled)}</span>
       </span>
     </div>
   );
 }
 
-// ── Step dots ──────────────────────────────────────────────────────────────
 function StepDots({ current, total }: { current: number; total: number }) {
   return (
-    <div style={S.stepDots}>
+    <div style={{ display: 'flex', gap: 4 }}>
       {Array.from({ length: total }, (_, i) => (
         <span key={i} style={{
           width: 6, height: 6, borderRadius: '50%',
           background: i < current ? C.primary : C.muted,
           display: 'inline-block',
-          transition: 'background 0.2s',
         }} />
       ))}
     </div>
   );
 }
 
-// ── Spinner ────────────────────────────────────────────────────────────────
-function Spinner() {
+function Spinner({ text = 'Thinking...' }: { text?: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: C.secondary, fontSize: 12 }}>
       <span style={{
-        width: 14, height: 14, border: `2px solid ${C.border}`,
-        borderTopColor: C.secondary, borderRadius: '50%',
+        width: 14, height: 14,
+        border: `2px solid ${C.border}`,
+        borderTopColor: C.secondary,
+        borderRadius: '50%',
         display: 'inline-block',
         animation: 'spin 0.7s linear infinite',
       }} />
-      <span>Thinking...</span>
+      <span>{text}</span>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
@@ -213,9 +197,8 @@ function Spinner() {
 
 // ── Main App ───────────────────────────────────────────────────────────────
 export default function App() {
-  const [phase, setPhase]         = useState<Phase>('idle');
+  const [phase, setPhase]         = useState<Phase>('login');
   const [rawPrompt, setRawPrompt] = useState('');
-  const [sessionId, setSessionId] = useState<string | null>(null);
   const [question, setQuestion]   = useState('');
   const [turnNum, setTurnNum]     = useState(1);
   const [answer, setAnswer]       = useState('');
@@ -223,26 +206,45 @@ export default function App() {
   const [scores, setScores]       = useState<Scores | null>(null);
   const [refuseMsg, setRefuseMsg] = useState('');
   const [copied, setCopied]       = useState(false);
+  const [error, setError]         = useState('');
 
-  const inputRef    = useRef<HTMLInputElement>(null);
-  const sessionRef  = useRef<string | null>(null);
-  const turnRef     = useRef<number>(1);
+  const inputRef   = useRef<HTMLInputElement>(null);
+  const sessionRef = useRef<string | null>(null);
+  const turnRef    = useRef<number>(1);
 
-  // Keep refs in sync so the message handler always sees latest values
-  useEffect(() => { sessionRef.current = sessionId; }, [sessionId]);
   useEffect(() => { turnRef.current = turnNum; }, [turnNum]);
 
-  // Single stable message handler — no dependency array issues
+  // Stable message handler
   useEffect(() => {
+    // Tell host we're ready — it will respond with authState
+    vscode?.postMessage({ type: 'ready' });
+
     const handler = (event: MessageEvent) => {
       const msg = event.data;
       switch (msg.type) {
+
+        case 'authState':
+          if (msg.loggedIn) {
+            setPhase((p) => (p === 'login' || p === 'loginPolling' || p === 'loginTimeout') ? 'idle' : p);
+          } else {
+            setPhase('login');
+          }
+          break;
+
+        case 'loginPolling':
+          setPhase('loginPolling');
+          break;
+
+        case 'loginTimeout':
+          setPhase('loginTimeout');
+          break;
+
         case 'sessionStarted':
-          setSessionId(msg.sessionId);
           sessionRef.current = msg.sessionId;
           setPhase('loading');
           vscode?.postMessage({ type: 'sendMessage', sessionId: msg.sessionId, userMessage: '_init_' });
           break;
+
         case 'messageResponse':
           if (msg.done) {
             if (msg.should_refuse) {
@@ -261,35 +263,31 @@ export default function App() {
             setTimeout(() => inputRef.current?.focus(), 80);
           }
           break;
+
+        case 'sessionError':
+          setError(msg.error ?? 'Something went wrong');
+          setPhase('idle');
+          break;
       }
     };
+
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, []); // empty — handler is stable via refs
+  }, []);
 
   const handleStart = () => {
     if (!rawPrompt.trim()) return;
+    setError('');
     setPhase('loading');
     vscode?.postMessage({ type: 'startSession', rawPrompt: rawPrompt.trim() });
   };
 
   const handleAnswer = () => {
     if (!answer.trim() || !sessionRef.current) return;
-    const currentAnswer = answer.trim();
+    const a = answer.trim();
     setAnswer('');
     setPhase('loading');
-    vscode?.postMessage({ type: 'sendMessage', sessionId: sessionRef.current, userMessage: currentAnswer });
-  };
-
-  const handleSendToTerminal = () => {
-    vscode?.postMessage({ type: 'sendToTerminal', assembledPrompt: assembled });
-    setPhase('sent');
-  };
-
-  const handleCopy = () => {
-    navigator.clipboard?.writeText(assembled);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    vscode?.postMessage({ type: 'sendMessage', sessionId: sessionRef.current, userMessage: a });
   };
 
   const reset = () => {
@@ -297,29 +295,88 @@ export default function App() {
     setRawPrompt('');
     setAssembled('');
     setScores(null);
-    setSessionId(null);
+    sessionRef.current = null;
     setTurnNum(1);
     setCopied(false);
+    setError('');
   };
 
   return (
     <div style={S.root}>
       {/* Header */}
-      <div style={S.header}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <div style={S.logo}>⚡ PromptOS</div>
-          <div style={S.version}>prompt refinement layer</div>
+          <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>prompt refinement layer</div>
         </div>
+        {phase !== 'login' && phase !== 'loginPolling' && phase !== 'loginTimeout' && (
+          <button
+            onClick={() => vscode?.postMessage({ type: 'logout' })}
+            style={{ background: 'transparent', border: 'none', color: C.muted, fontSize: 10, cursor: 'pointer', padding: '2px 4px' }}
+          >
+            logout
+          </button>
+        )}
       </div>
 
-      <div style={{ height: 1, background: `linear-gradient(90deg, ${C.primary}44, ${C.secondary}44, transparent)` }} />
+      <div style={S.divider} />
+
+      {/* ── LOGIN ── */}
+      {phase === 'login' && (
+        <>
+          <div style={{ ...S.card, textAlign: 'center', padding: '20px 16px' }}>
+            <div style={{ fontSize: 28, marginBottom: 8 }}>🔐</div>
+            <p style={{ margin: '0 0 6px', fontWeight: 600, fontSize: 13 }}>Sign in to PromptOS</p>
+            <p style={{ margin: '0 0 16px', fontSize: 11, color: C.muted, lineHeight: 1.5 }}>
+              Login via the dashboard to connect your account
+            </p>
+            <button
+              onClick={() => vscode?.postMessage({ type: 'login' })}
+              style={S.btnPrimary}
+            >
+              Login with Google →
+            </button>
+          </div>
+          <div style={{ fontSize: 10, color: C.muted, textAlign: 'center' }}>
+            Opens browser → login → auto-connects
+          </div>
+        </>
+      )}
+
+      {/* ── LOGIN POLLING ── */}
+      {phase === 'loginPolling' && (
+        <div style={{ ...S.card, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: 24 }}>
+          <Spinner text="Waiting for login..." />
+          <p style={{ fontSize: 11, color: C.muted, margin: 0, textAlign: 'center' }}>
+            Complete login in your browser — this will auto-connect
+          </p>
+        </div>
+      )}
+
+      {/* ── LOGIN TIMEOUT ── */}
+      {phase === 'loginTimeout' && (
+        <>
+          <div style={{ ...S.card, borderLeft: `3px solid ${C.warning}` }}>
+            <p style={{ margin: 0, fontSize: 12, color: C.warning, fontWeight: 600 }}>Login timed out</p>
+            <p style={{ margin: '4px 0 0', fontSize: 11, color: C.muted }}>Please try again</p>
+          </div>
+          <button onClick={() => vscode?.postMessage({ type: 'login' })} style={S.btnPrimary}>
+            Try again →
+          </button>
+        </>
+      )}
 
       {/* ── IDLE ── */}
       {phase === 'idle' && (
         <>
+          {error && (
+            <div style={{ ...S.card, borderLeft: `3px solid ${C.danger}`, padding: '8px 12px' }}>
+              <p style={{ margin: 0, fontSize: 11, color: C.danger }}>{error}</p>
+            </div>
+          )}
           <div style={S.label}>Your raw prompt</div>
           <textarea
-            placeholder="Paste your vague prompt here — PromptOS will refine it..."
+            placeholder="Paste your vague prompt here..."
             value={rawPrompt}
             onChange={(e) => setRawPrompt(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && e.metaKey && handleStart()}
@@ -380,22 +437,20 @@ export default function App() {
         <>
           <div style={{ fontSize: 11, color: C.accent, fontWeight: 600 }}>✦ Assembled Prompt</div>
           <pre style={S.pre}>{assembled}</pre>
-
           {scores && (
             <div style={{ ...S.card, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <ScoreRow label="Token Efficiency"  value={scores.token_efficiency_score} />
-              <ScoreRow label="Thinking Depth"    value={scores.thinking_depth_score} />
-              <ScoreRow label="AI Dependency"     value={scores.dependency_score} />
+              <ScoreRow label="Token Efficiency" value={scores.token_efficiency_score} />
+              <ScoreRow label="Thinking Depth"   value={scores.thinking_depth_score} />
+              <ScoreRow label="AI Dependency"    value={scores.dependency_score} />
               <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>
                 Turns saved: <span style={{ color: C.accent, fontWeight: 700 }}>{scores.estimated_turns_saved}</span>
               </div>
             </div>
           )}
-
-          <button onClick={handleSendToTerminal} style={S.btnAccent}>
+          <button onClick={() => { vscode?.postMessage({ type: 'sendToTerminal', assembledPrompt: assembled }); setPhase('sent'); }} style={S.btnAccent}>
             Send to Claude Code →
           </button>
-          <button onClick={handleCopy} style={S.btnSecondary}>
+          <button onClick={() => { navigator.clipboard?.writeText(assembled); setCopied(true); setTimeout(() => setCopied(false), 2000); }} style={S.btnSecondary}>
             {copied ? '✓ Copied!' : 'Copy to clipboard'}
           </button>
           <button onClick={reset} style={{ ...S.btnSecondary, color: C.muted, borderColor: 'transparent' }}>

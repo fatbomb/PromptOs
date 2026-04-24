@@ -166,19 +166,39 @@ async function runQuestionFlow(
   inputEl: HTMLElement | HTMLTextAreaElement | null,
   rawPrompt: string
 ): Promise<void> {
-  // Show loading state
   setContent(shadow, loadingHTML('Starting session...'));
+
+  // Check auth first
+  const token = await getToken();
+  if (!token) {
+    setContent(shadow, loginHTML());
+    shadow.getElementById('promptos-login-btn')?.addEventListener('click', () => {
+      window.open('http://localhost:3000/auth/login', '_blank');
+      hostDiv.remove();
+    });
+    shadow.getElementById('promptos-close-login-btn')?.addEventListener('click', () => hostDiv.remove());
+    return;
+  }
 
   let sessionId: string;
   try {
     const startRes = await apiFetch('/session/start', { raw_prompt: rawPrompt });
     sessionId = startRes.session_id as string;
   } catch (err) {
-    setContent(shadow, errorHTML(`Failed to start session: ${err}`));
+    const errMsg = String(err);
+    if (errMsg.includes('401') || errMsg.includes('403')) {
+      setContent(shadow, loginHTML());
+      shadow.getElementById('promptos-login-btn')?.addEventListener('click', () => {
+        window.open('http://localhost:3000/auth/login', '_blank');
+        hostDiv.remove();
+      });
+      shadow.getElementById('promptos-close-login-btn')?.addEventListener('click', () => hostDiv.remove());
+    } else {
+      setContent(shadow, errorHTML(`Failed to start session: ${err}`));
+    }
     return;
   }
 
-  // Kick off first turn
   await askNextQuestion(shadow, hostDiv, inputEl, sessionId, '_init_', 1);
 }
 
@@ -393,6 +413,26 @@ function completeHTML(assembled: string, scores?: Record<string, number>): strin
         ${scoresHTML}
         <button id="promptos-inject-btn-confirm" class="accent-btn">Inject into chat →</button>
         <button id="promptos-cancel-btn" class="secondary-btn">Cancel</button>
+      </div>
+    </div>
+  `;
+}
+
+function loginHTML(): string {
+  return `
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title">⚡ PromptOS</span>
+        <button id="promptos-close-login-btn" class="close-btn">×</button>
+      </div>
+      <div class="modal-body center" style="padding: 24px 16px;">
+        <div style="font-size:28px;margin-bottom:12px;">🔐</div>
+        <p style="font-weight:700;font-size:14px;margin-bottom:8px;color:#e2e8f0;">Sign in required</p>
+        <p style="font-size:12px;color:#6B7280;margin-bottom:20px;line-height:1.6;text-align:center;">
+          Login via the PromptOS dashboard to use the extension
+        </p>
+        <button id="promptos-login-btn" class="primary-btn">Login with Google →</button>
+        <p style="font-size:10px;color:#374151;margin-top:10px;">Opens localhost:3000 in a new tab</p>
       </div>
     </div>
   `;

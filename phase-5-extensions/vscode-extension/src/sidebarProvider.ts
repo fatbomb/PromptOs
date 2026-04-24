@@ -3,6 +3,7 @@
  *
  * Registers the React webview in the PromptOS sidebar.
  * Handles message passing between the webview and the extension host.
+ * Enforces login — sends auth state to webview on load.
  */
 
 import * as vscode from 'vscode';
@@ -13,16 +14,17 @@ export class PromptosSidebarProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
   private _api: ApiClient;
   private _apiBase: string;
+  private _dashboardBase: string;
 
   constructor(private readonly _context: vscode.ExtensionContext) {
-    // Read config inside constructor — safe to call after activation
     this._apiBase = vscode.workspace
       .getConfiguration('promptos')
       .get<string>('apiUrl', 'http://localhost:8000');
+    this._dashboardBase = this._apiBase.replace('8000', '3000');
     this._api = new ApiClient(this._apiBase, _context.secrets);
   }
 
-  resolveWebviewView(webviewView: vscode.WebviewView) {
+  async resolveWebviewView(webviewView: vscode.WebviewView) {
     this._view = webviewView;
     webviewView.webview.options = {
       enableScripts: true,
@@ -31,36 +33,95 @@ export class PromptosSidebarProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.html = this._getHtml(webviewView.webview);
 
-    // Handle messages from React webview
+    // Send initial auth state once webview is ready
     webviewView.webview.onDidReceiveMessage(async (msg) => {
       switch (msg.type) {
+
+        // ── Webview ready — send auth state ──────────────────────────────
+        case 'ready': {
+          const loggedIn = await this._api.isLoggedIn();
+          webviewView.webview.postMessage({ type: 'authState', loggedIn });
+          break;
+        }
+
+        // ── Login — open browser + poll for JWT ──────────────────────────
+        case 'login': {
+          const bytes = new Uint8Array(16);
+          // Use vscode's built-in randomness via a simple timestamp+random combo
+          const state = Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+          const loginUrl = `${this._dashboardBase}/auth/login?state=${state}`;
+          await vscode.env.openExternal(vscode.Uri.parse(loginUrl));
+
+          // Poll every 2s for up to 60s
+          webviewView.webview.postMessage({ type: 'loginPolling' });
+          let found = false;
+          for (let i = 0; i < 30; i++) {
+            await _sleep(2000);
+            try {
+              const token = await this._api.pollForCliToken(state);
+              if (token) {
+                await this._api.storeToken(token);
+                found = true;
+                webviewView.webview.postMessage({ type: 'authState', loggedIn: true });
+                break;
+              }
+            } catch { /* keep polling */ }
+          }
+          if (!found) {
+            webviewView.webview.postMessage({ type: 'loginTimeout' });
+          }
+          break;
+        }
+
+        // ── Logout ────────────────────────────────────────────────────────
+        case 'logout': {
+          await this._api.clearToken();
+          webviewView.webview.postMessage({ type: 'authState', loggedIn: false });
+          break;
+        }
+
+        // ── Session flow ──────────────────────────────────────────────────
         case 'startSession': {
-          const result = await this._api.startSession(msg.rawPrompt, msg.workspaceContext);
-          webviewView.webview.postMessage({ type: 'sessionStarted', sessionId: result.session_id });
+          try {
+            const result = await this._api.startSession(msg.rawPrompt, msg.workspaceContext);
+            webviewView.webview.postMessage({ type: 'sessionStarted', sessionId: result.session_id });
+          } catch (e: unknown) {
+            if ((e as Error).message === 'UNAUTHORIZED') {
+              await this._api.clearToken();
+              webviewView.webview.postMessage({ type: 'authState', loggedIn: false });
+            } else {
+              webviewView.webview.postMessage({ type: 'sessionError', error: String(e) });
+            }
+          }
           break;
         }
+
         case 'sendMessage': {
-          const result = await this._api.sendMessage(msg.sessionId, msg.userMessage);
-          webviewView.webview.postMessage({ type: 'messageResponse', ...result });
+          try {
+            const result = await this._api.sendMessage(msg.sessionId, msg.userMessage);
+            webviewView.webview.postMessage({ type: 'messageResponse', ...result });
+          } catch (e: unknown) {
+            if ((e as Error).message === 'UNAUTHORIZED') {
+              await this._api.clearToken();
+              webviewView.webview.postMessage({ type: 'authState', loggedIn: false });
+            } else {
+              webviewView.webview.postMessage({ type: 'sessionError', error: String(e) });
+            }
+          }
           break;
         }
+
         case 'completeSession': {
           await this._api.completeSession(msg.sessionId);
           const summary = await this._api.getTokenSummary();
           webviewView.webview.postMessage({ type: 'sessionComplete', summary });
           break;
         }
+
         case 'sendToTerminal': {
-          // Task 5.3 — paste assembled prompt into terminal
           await vscode.commands.executeCommand('workbench.action.terminal.sendSequence', {
             text: msg.assembledPrompt + '\n',
           });
-          break;
-        }
-        case 'login': {
-          // Open dashboard login in browser
-          const dashboardUrl = this._apiBase.replace('8000', '3000');
-          vscode.env.openExternal(vscode.Uri.parse(`${dashboardUrl}/auth/login`));
           break;
         }
       }
@@ -108,4 +169,8 @@ export class PromptosSidebarProvider implements vscode.WebviewViewProvider {
     }
     return text;
   }
+}
+
+function _sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

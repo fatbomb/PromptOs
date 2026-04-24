@@ -3,9 +3,7 @@
  *
  * Wraps all PromptOS API calls for the VS Code extension.
  * JWT is stored in vscode.SecretStorage (OS-keychain backed).
- *
- * Auth is optional — when the backend runs with AUTH_REQUIRED=false (default)
- * no token is needed. The Authorization header is sent only when a token exists.
+ * Auth is required — backend enforces JWT validation.
  */
 
 import * as vscode from 'vscode';
@@ -16,13 +14,31 @@ export class ApiClient {
     private readonly secrets: vscode.SecretStorage,
   ) {}
 
-  private async _headers(): Promise<HeadersInit> {
-    const token = await this.secrets.get('promptos.jwt');
+  async getToken(): Promise<string | null> {
+    return await this.secrets.get('promptos.jwt') ?? null;
+  }
+
+  async storeToken(token: string): Promise<void> {
+    await this.secrets.store('promptos.jwt', token);
+  }
+
+  async clearToken(): Promise<void> {
+    await this.secrets.delete('promptos.jwt');
+  }
+
+  private async _headers(): Promise<Record<string, string>> {
+    const token = await this.getToken();
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
     return headers;
+  }
+
+  /** Returns true if a JWT is stored */
+  async isLoggedIn(): Promise<boolean> {
+    const token = await this.getToken();
+    return !!token;
   }
 
   async startSession(rawPrompt: string, workspaceContext?: object) {
@@ -31,6 +47,7 @@ export class ApiClient {
       headers: await this._headers(),
       body: JSON.stringify({ raw_prompt: rawPrompt, workspace_context: workspaceContext ?? {} }),
     });
+    if (res.status === 401) throw new Error('UNAUTHORIZED');
     return res.json();
   }
 
@@ -40,6 +57,7 @@ export class ApiClient {
       headers: await this._headers(),
       body: JSON.stringify({ session_id: sessionId, user_message: userMessage }),
     });
+    if (res.status === 401) throw new Error('UNAUTHORIZED');
     return res.json();
   }
 
@@ -59,7 +77,13 @@ export class ApiClient {
     return res.json();
   }
 
-  async storeToken(token: string) {
-    await this.secrets.store('promptos.jwt', token);
+  /** Poll /auth/cli-token?state=xxx to pick up JWT after OAuth */
+  async pollForCliToken(state: string): Promise<string | null> {
+    const res = await fetch(`${this.baseUrl}/auth/cli-token?state=${state}`);
+    if (res.ok) {
+      const data = await res.json();
+      return data.token ?? null;
+    }
+    return null;
   }
 }
