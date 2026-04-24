@@ -6,12 +6,9 @@ Uses Gemini Flash to extract concept tags from the assembled prompt,
 then upserts them into the `concept_map` Supabase table.
 """
 
-import os
 import json
-import google.generativeai as genai
-
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-_model = genai.GenerativeModel("gemini-2.0-flash")
+from google import genai
+from services.supabase_client import upsert_concept_db
 
 EXTRACT_PROMPT = """Extract the core programming/engineering concepts from this prompt.
 Output ONLY a JSON array of short concept strings (2–4 words max each).
@@ -21,6 +18,8 @@ Prompt:
 {assembled_prompt}
 
 Output ONLY valid JSON array:"""
+
+_client = genai.Client()
 
 
 async def extract_and_store_concepts(
@@ -35,8 +34,18 @@ async def extract_and_store_concepts(
     """
     try:
         prompt = EXTRACT_PROMPT.format(assembled_prompt=assembled_prompt)
-        response = _model.generate_content(prompt)
-        concepts: list[str] = json.loads(response.text.strip())
+        
+        # Use native async method from the new genai SDK
+        response = await _client.aio.models.generate_content(
+            model="gemini-3-flash-preview",
+            contents=prompt,
+        )
+        text = response.text.strip()
+        # Strip markdown fences if present
+        if text.startswith("```"):
+            lines = text.splitlines()
+            text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+        concepts: list[str] = json.loads(text)
     except Exception:
         concepts = []
 
@@ -44,16 +53,8 @@ async def extract_and_store_concepts(
 
     for concept in concepts:
         color_band = _score_to_color(dependency_score)
-        # TODO (Task 3.2): upsert concept into Supabase `concept_map`
-        # supabase.table("concept_map").upsert({
-        #     "user_id": user_id,
-        #     "concept": concept,
-        #     "encounter_count": 1,   # increment via RPC
-        #     "avg_score": dependency_score,
-        #     "color_band": color_band,
-        #     "last_seen_at": "now()",
-        # }, on_conflict="user_id,concept").execute()
-        print(f"[concept_extractor] Extracted: {concept} ({color_band})")
+        upsert_concept_db(user_id, concept, dependency_score, color_band)
+        print(f"[concept_extractor] session={session_id} concept={concept!r} band={color_band}")
 
 
 def _score_to_color(score: int) -> str:

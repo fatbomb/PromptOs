@@ -1,104 +1,89 @@
 'use client';
 
-/**
- * QuizModal Component — Phase 4, Task 4.4
- *
- * Shown when a user clicks an amber/red bubble in the Knowledge Map.
- * Fetches 3 MCQ questions from /api/quiz, renders them, and on submit:
- *   - Calculates score
- *   - Saves attempt to quiz_attempts table
- *   - Updates concept_map avg_score
- *   - Shows streak counter
- */
-
-import { useState, useEffect } from 'react';
-
-interface Question {
-  q: string;
-  options: string[];
-  correct_index: number;
-}
+import { useState } from 'react';
 
 interface Props {
   concept: string;
   onClose: () => void;
 }
 
+const mockQuestions = [
+  { q: "Which HTTP status code typically indicates 'Unauthorized'?", options: ["400", "401", "403", "500"], ans: 1 },
+  { q: "What is the primary purpose of a JWT?", options: ["Database caching", "Session tracking via stateful database entries", "Stateless authentication", "Encrypting files"], ans: 2 },
+  { q: "Row Level Security (RLS) in Supabase is built on top of what technology?", options: ["Node.js Middleware", "Postgres native policies", "Redis ACLs", "Next.js Edge Functions"], ans: 1 },
+];
+
 export default function QuizModal({ concept, onClose }: Props) {
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [answers, setAnswers]     = useState<number[]>([]);
-  const [submitted, setSubmitted] = useState(false);
-  const [score, setScore]         = useState<number | null>(null);
-  const [loading, setLoading]     = useState(true);
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const [score, setScore] = useState(0);
+  const [finished, setFinished] = useState(false);
+  const [selected, setSelected] = useState<number | null>(null);
 
-  useEffect(() => {
-    fetch('/api/quiz', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ concept }),
-    })
-      .then((r) => r.json())
-      .then((data) => { setQuestions(data.questions ?? []); setLoading(false); });
-  }, [concept]);
-
-  const handleSubmit = () => {
-    const correct = questions.filter((q, i) => answers[i] === q.correct_index).length;
-    const pct = Math.round((correct / questions.length) * 100);
-    setScore(pct);
-    setSubmitted(true);
-    // TODO: save to quiz_attempts and update concept_map via Supabase
+  const handleNext = () => {
+    if (selected === mockQuestions[currentIdx].ans) {
+      setScore(score + 1);
+    }
+    
+    if (currentIdx < mockQuestions.length - 1) {
+      setCurrentIdx(currentIdx + 1);
+      setSelected(null);
+    } else {
+      setFinished(true);
+    }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-900 rounded-2xl w-full max-w-lg p-8 shadow-2xl">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold">Quiz: {concept}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl leading-none">×</button>
-        </div>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in-up">
+      <div className="glass-panel w-full max-w-lg rounded-3xl p-8 relative shadow-2xl border border-white/10">
+        
+        <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors">
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
 
-        {loading && <p className="text-gray-400">Generating questions...</p>}
-
-        {!loading && !submitted && questions.map((q, qi) => (
-          <div key={qi} className="mb-6">
-            <p className="font-medium mb-3">{qi + 1}. {q.q}</p>
-            <div className="space-y-2">
-              {q.options.map((opt, oi) => (
-                <button
-                  key={oi}
-                  onClick={() => setAnswers((prev) => { const a = [...prev]; a[qi] = oi; return a; })}
-                  className={`w-full text-left px-4 py-2 rounded-lg border transition-colors ${
-                    answers[qi] === oi
-                      ? 'border-blue-500 bg-blue-500/20'
-                      : 'border-gray-700 hover:border-gray-500'
-                  }`}
-                >
-                  {opt}
-                </button>
-              ))}
+        {!finished ? (
+          <div>
+            <div className="mb-6">
+              <span className="text-xs font-bold text-amber-500 uppercase tracking-widest border border-amber-500/30 bg-amber-500/10 px-3 py-1 rounded-full mb-4 inline-block">Remediation Module Active</span>
+              <h2 className="text-2xl font-bold text-[var(--text-primary)] mt-2">Knowledge Quiz: {concept}</h2>
+              <p className="text-sm text-[var(--text-secondary)] mt-1">Question {currentIdx + 1} of {mockQuestions.length}</p>
             </div>
-          </div>
-        ))}
 
-        {!submitted && !loading && (
-          <button
-            onClick={handleSubmit}
-            disabled={answers.length < questions.length}
-            className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-40 px-4 py-3 rounded-xl font-semibold transition-colors"
-          >
-            Submit Answers
-          </button>
-        )}
+            <div className="mb-8">
+              <p className="text-lg font-medium text-[var(--text-primary)] mb-6">{mockQuestions[currentIdx].q}</p>
+              
+              <div className="space-y-3">
+                {mockQuestions[currentIdx].options.map((opt, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setSelected(i)}
+                    className={`w-full text-left px-5 py-4 rounded-xl border transition-all ${
+                      selected === i 
+                        ? 'border-blue-500 bg-blue-500/10 text-blue-600 dark:text-white shadow-[0_0_15px_rgba(59,130,246,0.3)]' 
+                        : 'border-[var(--glass-border)] hover:border-gray-400 bg-[var(--glass-card-bg)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-        {submitted && score !== null && (
-          <div className="text-center py-4">
-            <p className="text-5xl font-bold mb-2">{score}%</p>
-            <p className={score >= 70 ? 'text-green-400' : score >= 40 ? 'text-amber-400' : 'text-red-400'}>
-              {score >= 70 ? '✅ Concept mastered' : score >= 40 ? '📚 Keep practising' : '🔴 Needs review'}
-            </p>
-            <button onClick={onClose} className="mt-6 text-gray-400 hover:text-white underline text-sm">
-              Close
+            <button
+              onClick={handleNext}
+              disabled={selected === null}
+              className="w-full py-4 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold hover:shadow-[0_0_20px_rgba(168,85,247,0.4)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {currentIdx === mockQuestions.length - 1 ? 'Submit Answers' : 'Next Question'}
             </button>
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <div className="w-20 h-20 bg-emerald-500/20 border border-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
+               <svg className="w-10 h-10 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+            </div>
+            <h2 className="text-3xl font-extrabold text-white mb-2">Module Complete</h2>
+            <p className="text-gray-400 mb-8">You scored {score}/{mockQuestions.length} on the {concept} concept test.</p>
+            <button onClick={onClose} className="px-8 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold transition-all border border-white/10">Return to Dashboard</button>
           </div>
         )}
       </div>

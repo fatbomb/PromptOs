@@ -23,14 +23,15 @@ export async function askCommand(rawPrompt, options) {
     process.exit(1);
   }
 
-  // Handle --skip flag (Task 2.4)
-  if (options.skip) {
-    console.log(chalk.yellow('\n⚠  Skip mode. Calling claude directly.\n'));
+  let mode = 'default';
+  if (options.skip) mode = 'skip';
+  else if (options.basic) mode = 'basic';
+
+  if (mode === 'skip') {
+    console.log(chalk.yellow('\n⚠  Skip mode. PromptOS will format a 0-shot prompt immediately without asking questions.\n'));
     console.log(
       chalk.dim('Your last 5 skipped sessions averaged 5.2 turns. Your PromptOS sessions average 1.4. That\'s your choice to make.\n')
     );
-    // TODO: spawn claude directly with rawPrompt
-    return;
   }
 
   const headers = {
@@ -43,7 +44,7 @@ export async function askCommand(rawPrompt, options) {
   const startRes = await fetch(`${API}/session/start`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ raw_prompt: rawPrompt }),
+    body: JSON.stringify({ raw_prompt: rawPrompt, mode }),
   }).then((r) => r.json());
   spinner.stop();
 
@@ -109,6 +110,8 @@ export async function askCommand(rawPrompt, options) {
 
   const summary = await fetch(`${API}/tokens/summary`, { headers }).then((r) => r.json());
   printReceipt({ rawPrompt, scores, summary });
+
+  return assembled;
 }
 
 function _printScoreBar(scores) {

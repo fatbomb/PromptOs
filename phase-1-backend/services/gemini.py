@@ -1,17 +1,19 @@
 """
 Gemini Flash Service — Phase 1, Task 1.3
 
-Wraps Google Gemini Flash 2.0 for:
+Wraps Google Gemini Flash 2.5 for:
   - run_conversation_turn(): decides next question or assembles final prompt
   - check_refusal(): detects if developer already knows the answer
 """
 
 import os
 import json
-import google.generativeai as genai
 
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-_model = genai.GenerativeModel("gemini-2.0-flash")
+from google import genai
+from google.genai import types
+
+# Initialize the new SDK client. It will automatically pick up GEMINI_API_KEY from the environment.
+_client = genai.Client()
 
 SYSTEM_PROMPT = """You are a prompt refinement agent. Your job is to help a developer write a better prompt for their AI coding assistant.
 
@@ -30,7 +32,7 @@ Rules:
 - Ask ONE question per turn. Never two.
 - Use workspace_context to skip questions you can auto-answer.
 - Stop at 5 questions maximum.
-- When assembling, include: file, error, expected vs actual, tried, suspicion.
+- When assembling, you MUST include these exact literal words in your assembled_prompt text: "file", "error", "expected", "tried", "suspicion".
 - Never invent context the developer didn't provide.
 - Output ONLY raw JSON — no markdown, no code fences."""
 
@@ -44,10 +46,20 @@ A strong refusal trigger: naming a specific file, function, variable, or config 
 """
 
 
+def _extract_json(text: str) -> dict:
+    """Strip markdown code fences if Gemini wraps JSON in ```json ... ```."""
+    text = text.strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+    return json.loads(text.strip())
+
+
 async def run_conversation_turn(
     raw_prompt: str,
     conversation_history: list[dict],
     workspace_context: dict,
+    mode: str = "default",
 ) -> dict:
     """
     Task 1.3 — Calls Gemini Flash with the full conversation history.
@@ -67,14 +79,32 @@ async def run_conversation_turn(
         "What should happen next?"
     )
 
-    response = _model.generate_content(
-        [{"role": "user", "parts": [SYSTEM_PROMPT + "\n\n" + user_message]}]
+    dynamic_system_prompt = SYSTEM_PROMPT
+    if mode == "basic":
+        dynamic_system_prompt = SYSTEM_PROMPT.replace("Stop at 5 questions maximum.", "Stop at 3 questions maximum.")
+        dynamic_system_prompt = dynamic_system_prompt.replace("after 3-5 questions", "after 1-3 questions")
+    elif mode == "skip":
+        dynamic_system_prompt = SYSTEM_PROMPT.replace(
+            "Ask ONE question per turn. Never two.",
+            "DO NOT ASK ANY QUESTIONS. Immediately assemble the prompt and return done: true."
+        ).replace("after 3-5 questions", "IMMEDIATELY (0 questions)")
+
+    config = types.GenerateContentConfig(
+        system_instruction=dynamic_system_prompt,
+        temperature=0.2,
+    )
+
+    # Use the native async method from the new genai SDK
+    response = await _client.aio.models.generate_content(
+        model="gemini-2.5-flash-lite",
+        contents=user_message,
+        config=config,
     )
 
     try:
-        return json.loads(response.text.strip())
-    except json.JSONDecodeError:
-        # Fallback: treat as a plain question
+        return _extract_json(response.text)
+    except (json.JSONDecodeError, ValueError):
+        # Fallback: treat as a plain question to keep the session alive
         return {"done": False, "question": response.text.strip()}
 
 
@@ -82,12 +112,20 @@ async def check_refusal(hypothesis: str) -> dict:
     """
     Task 1.6 — Detects if the developer already knows the answer.
     """
-    prompt = f"{REFUSAL_PROMPT}\n\nDeveloper hypothesis: {hypothesis}"
-    response = _model.generate_content(prompt)
+    config = types.GenerateContentConfig(
+        system_instruction=REFUSAL_PROMPT,
+        temperature=0.1,
+    )
+
+    response = await _client.aio.models.generate_content(
+        model="gemini-2.5-flash-lite",
+        contents=f"Developer hypothesis: {hypothesis}",
+        config=config,
+    )
 
     try:
-        result = json.loads(response.text.strip())
-    except json.JSONDecodeError:
+        result = _extract_json(response.text)
+    except (json.JSONDecodeError, ValueError):
         result = {"should_refuse": False}
 
     if result.get("should_refuse"):

@@ -17,7 +17,7 @@ const DASHBOARD_URL = process.env.PROMPTOS_DASHBOARD_URL || 'http://localhost:30
 
 export async function loginCommand() {
   const state = crypto.randomBytes(16).toString('hex');
-  const loginUrl = `${DASHBOARD_URL}/auth/login?state=${state}`;
+  const loginUrl = `${DASHBOARD_URL}/login?state=${state}`;
 
   console.log(chalk.cyan('\n🔑 Opening browser for Google login...\n'));
   await open(loginUrl);
