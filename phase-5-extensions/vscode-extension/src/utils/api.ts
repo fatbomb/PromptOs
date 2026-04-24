@@ -45,7 +45,11 @@ export class ApiClient {
     const res = await fetch(`${this.baseUrl}/session/start`, {
       method: 'POST',
       headers: await this._headers(),
-      body: JSON.stringify({ raw_prompt: rawPrompt, workspace_context: workspaceContext ?? {} }),
+      body: JSON.stringify({
+        raw_prompt: rawPrompt,
+        workspace_context: workspaceContext ?? {},
+        source: 'vscode',
+      }),
     });
     if (res.status === 401) throw new Error('UNAUTHORIZED');
     return res.json();

@@ -375,6 +375,7 @@ async function runQuestionFlow(shadow, hostDiv, inputEl, rawPrompt) {
             mode: sessionConfig.mode,
             target_tool: resolvedTool,
             workspace_context: Object.keys(workspaceContext).length > 0 ? workspaceContext : null,
+            source: 'browser_extension',
         });
         sessionId = startRes.session_id;
     }

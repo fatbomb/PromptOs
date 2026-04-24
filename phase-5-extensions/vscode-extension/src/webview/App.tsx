@@ -1,5 +1,5 @@
 /**
- * VS Code Webview React App — Phase 5, Task 5.3
+ * VS Code Webview React App — PromptOS Copilot
  *
  * State machine:
  *   login → loginPolling → idle → loading → asking → complete → sent | refused
@@ -53,7 +53,7 @@ const S: Record<string, React.CSSProperties> = {
   shell: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 12,
+    gap: 10,
     maxWidth: 360,
     margin: '0 auto',
     background: C.panel,
@@ -62,7 +62,7 @@ const S: Record<string, React.CSSProperties> = {
     padding: 12,
   },
   logo: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 700,
     color: C.text,
     letterSpacing: '-0.02em',
@@ -72,11 +72,12 @@ const S: Record<string, React.CSSProperties> = {
     background: 'var(--vscode-panel-border, var(--vscode-input-border, #313244))',
   },
   sectionTitle: {
-    fontSize: 11,
+    fontSize: 10,
     color: C.muted,
     textTransform: 'uppercase',
     letterSpacing: '0.08em',
     fontWeight: 600,
+    marginBottom: 6,
   },
   progressTrack: {
     width: '100%',
@@ -104,7 +105,7 @@ const S: Record<string, React.CSSProperties> = {
     resize: 'vertical' as const,
     outline: 'none',
     lineHeight: 1.5,
-    minHeight: 104,
+    minHeight: 80,
   },
   input: {
     width: '100%',
@@ -179,6 +180,26 @@ const S: Record<string, React.CSSProperties> = {
     letterSpacing: '0.08em',
     fontWeight: 600,
   },
+  resultBadge: {
+    fontSize: 9,
+    fontWeight: 600,
+    padding: '2px 8px',
+    borderRadius: 999,
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.04em',
+    border: `1px solid ${C.border}`,
+    color: C.muted,
+  },
+  optionPill: {
+    padding: '6px 12px',
+    background: 'var(--vscode-editor-background)',
+    color: C.text,
+    border: `1px solid ${C.border}`,
+    borderRadius: 999,
+    fontSize: 12,
+    cursor: 'pointer',
+    transition: 'border-color 0.15s',
+  },
 };
 
 function ScoreRow({ label, value }: { label: string; value: number }) {
@@ -213,11 +234,38 @@ function Spinner({ text = 'Thinking...' }: { text?: string }) {
   );
 }
 
+function isLikelyFeatureBuildPrompt(prompt: string): boolean {
+  const p = prompt.toLowerCase();
+  const intentVerb = /(build|create|develop|make|implement)/.test(p);
+  const targetNoun = /(app|application|website|platform|tool|dashboard|tracker|system|project)/.test(p);
+  return intentVerb && targetNoun;
+}
+
+function buildSessionContext(prompt: string): Record<string, unknown> {
+  const featureBuild = isLikelyFeatureBuildPrompt(prompt);
+
+  return {
+    refinement_preferences: {
+      ask_one_question_per_turn: true,
+      prefer_relevant_questions: true,
+      question_priority_for_feature_requests: [
+        'what should it do',
+        'which stack should be used',
+        'must-have features',
+        'constraints and scope',
+      ],
+      avoid_for_feature_requests: ['error message', 'stack trace'],
+    },
+    inferred_intent: featureBuild ? 'feature_build' : 'unspecified',
+  };
+}
+
 // ── Main App ───────────────────────────────────────────────────────────────
 export default function App() {
   const [phase, setPhase]         = useState<Phase>('login');
   const [rawPrompt, setRawPrompt] = useState('');
   const [question, setQuestion]   = useState('');
+  const [options, setOptions]     = useState<string[]>([]);
   const [turnNum, setTurnNum]     = useState(1);
   const [answer, setAnswer]       = useState('');
   const [assembled, setAssembled] = useState('');
@@ -225,16 +273,15 @@ export default function App() {
   const [refuseMsg, setRefuseMsg] = useState('');
   const [copied, setCopied]       = useState(false);
   const [error, setError]         = useState('');
-  const [repeatHint, setRepeatHint] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const inputRef   = useRef<HTMLInputElement>(null);
   const sessionRef = useRef<string | null>(null);
   const lastQuestionRef = useRef('');
+  const autoClassifiedFirstQuestionRef = useRef(false);
 
   // Stable message handler
   useEffect(() => {
-    // Tell host we're ready — it will respond with authState
     vscode?.postMessage({ type: 'ready' });
 
     const handler = (event: MessageEvent) => {
@@ -278,27 +325,42 @@ export default function App() {
             }
           } else {
             const nextQuestion = String(msg.question ?? '').trim();
+            const nextOptions = Array.isArray(msg.options) ? msg.options as string[] : [];
             const hasTurn = typeof msg.turn === 'number' && Number.isFinite(msg.turn);
-            const normalizedTurn = hasTurn ? Math.max(1, Math.min(4, Number(msg.turn))) : null;
-            const hadPreviousQuestion = Boolean(lastQuestionRef.current);
-            const isRepeat = nextQuestion.length > 0 && nextQuestion === lastQuestionRef.current;
+
+            const firstQuestionIsGenericCategory =
+              hasTurn &&
+              Number(msg.turn) === 1 &&
+              /^what type of request is this\??$/i.test(nextQuestion);
+
+            if (
+              firstQuestionIsGenericCategory &&
+              !autoClassifiedFirstQuestionRef.current &&
+              isLikelyFeatureBuildPrompt(rawPrompt)
+            ) {
+              autoClassifiedFirstQuestionRef.current = true;
+              setIsSubmitting(true);
+              setPhase('loading');
+              vscode?.postMessage({
+                type: 'sendMessage',
+                sessionId: sessionRef.current,
+                userMessage: 'New feature',
+              });
+              return;
+            }
 
             if (nextQuestion) {
               setQuestion(nextQuestion);
               lastQuestionRef.current = nextQuestion;
             }
+            setOptions(nextOptions);
 
-            if (normalizedTurn !== null) {
-              setTurnNum(normalizedTurn);
+            if (hasTurn) {
+              setTurnNum(Math.max(1, Number(msg.turn)));
             } else {
-              setTurnNum((prev) => {
-                if (!hadPreviousQuestion) return 1;
-                if (isRepeat) return prev;
-                return Math.min(4, prev + 1);
-              });
+              setTurnNum((prev) => prev + 1);
             }
 
-            setRepeatHint(isRepeat ? 'Looks like this still needs more detail. Short answers are fine, and “not sure” is okay.' : '');
             setPhase('asking');
             setTimeout(() => inputRef.current?.focus(), 80);
           }
@@ -316,22 +378,28 @@ export default function App() {
     return () => window.removeEventListener('message', handler);
   }, []);
 
-  const handleStart = () => {
-    if (!rawPrompt.trim() || isSubmitting) return;
+  const handleStart = (presetPrompt?: string) => {
+    const prompt = presetPrompt || rawPrompt.trim();
+    if (!prompt || isSubmitting) return;
     setIsSubmitting(true);
     setError('');
-    setRepeatHint('');
     setQuestion('');
+    setOptions([]);
     lastQuestionRef.current = '';
+    autoClassifiedFirstQuestionRef.current = false;
     setTurnNum(1);
     setPhase('loading');
-    vscode?.postMessage({ type: 'startSession', rawPrompt: rawPrompt.trim() });
+    vscode?.postMessage({
+      type: 'startSession',
+      rawPrompt: prompt,
+      workspaceContext: buildSessionContext(prompt),
+    });
   };
 
-  const handleAnswer = () => {
-    if (!answer.trim() || !sessionRef.current || isSubmitting) return;
+  const handleAnswer = (answerText?: string) => {
+    const a = answerText || answer.trim();
+    if (!a || !sessionRef.current || isSubmitting) return;
     setIsSubmitting(true);
-    const a = answer.trim();
     setAnswer('');
     setPhase('loading');
     vscode?.postMessage({ type: 'sendMessage', sessionId: sessionRef.current, userMessage: a });
@@ -345,16 +413,14 @@ export default function App() {
     sessionRef.current = null;
     setTurnNum(1);
     setQuestion('');
+    setOptions([]);
     setAnswer('');
-    setRepeatHint('');
     setIsSubmitting(false);
     lastQuestionRef.current = '';
+    autoClassifiedFirstQuestionRef.current = false;
     setCopied(false);
     setError('');
   };
-
-  const progress = Math.max(1, Math.min(turnNum, 4));
-  const progressPct = `${(progress / 4) * 100}%`;
 
   return (
     <div style={S.root}>
@@ -362,8 +428,8 @@ export default function App() {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div style={S.logo}>PromptOS</div>
-          <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Prompt refinement assistant</div>
+          <div style={S.logo}>⚡ PromptOS Copilot</div>
+          <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>prompt refinement assistant</div>
         </div>
         {phase !== 'login' && phase !== 'loginPolling' && phase !== 'loginTimeout' && (
           <button
@@ -431,21 +497,18 @@ export default function App() {
               <p style={{ margin: 0, fontSize: 11, color: C.danger }}>{error}</p>
             </div>
           )}
-          <div style={S.label}>Your raw prompt</div>
+          <div style={S.divider} />
+
+          <div style={S.label}>Your prompt</div>
           <textarea
             placeholder="Describe what you want help with..."
             value={rawPrompt}
             onChange={(e) => setRawPrompt(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && e.metaKey && handleStart()}
-            rows={5}
+            rows={4}
             style={S.textarea}
           />
-          <div style={{ ...S.card, padding: '10px 12px' }}>
-            <div style={{ fontSize: 11, color: C.muted, lineHeight: 1.5 }}>
-              You’ll get up to 4 short clarification questions before we assemble your final prompt.
-            </div>
-          </div>
-          <button onClick={handleStart} style={S.btnPrimary} disabled={!rawPrompt.trim()}>
+          <button onClick={() => handleStart()} style={S.btnPrimary} disabled={!rawPrompt.trim()}>
             Start refinement
           </button>
           <div style={{ fontSize: 10, color: C.muted, textAlign: 'center' }}>⌘↵ to start</div>
@@ -462,22 +525,24 @@ export default function App() {
       {/* ── ASKING ── */}
       {phase === 'asking' && (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-            <span style={{ fontSize: 11, color: C.muted, whiteSpace: 'nowrap' }}>Step {progress} of 4</span>
-            <div style={S.progressTrack}>
-              <div style={{ ...S.progressFill, width: progressPct }} />
-            </div>
-          </div>
           <div style={{ ...S.card, borderLeft: `3px solid ${C.primary}` }}>
             <div style={S.sectionTitle}>Question</div>
-            <p style={{ margin: '8px 0 0', fontWeight: 600, fontSize: 14, lineHeight: 1.5 }}>{question}</p>
+            <p style={{ margin: '4px 0 0', fontWeight: 600, fontSize: 13, lineHeight: 1.5 }}>{question}</p>
           </div>
-          <div style={{ fontSize: 11, color: C.muted }}>
-            Keep it short. If you’re unsure, say “not sure”.
-          </div>
-          {repeatHint && (
-            <div style={{ ...S.card, borderLeft: `3px solid ${C.warning}`, padding: '8px 10px' }}>
-              <p style={{ margin: 0, fontSize: 11, color: C.warning }}>{repeatHint}</p>
+
+          {/* Options pills */}
+          {options.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {options.map((opt, i) => (
+                <button
+                  key={i}
+                  onClick={() => handleAnswer(opt)}
+                  style={S.optionPill}
+                  disabled={isSubmitting}
+                >
+                  {opt}
+                </button>
+              ))}
             </div>
           )}
           <input
@@ -485,19 +550,21 @@ export default function App() {
             value={answer}
             onChange={(e) => setAnswer(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAnswer()}
-            placeholder="Your answer"
+            placeholder="Or type your answer..."
             style={S.input}
           />
-          <button onClick={handleAnswer} style={S.btnPrimary} disabled={!answer.trim() || isSubmitting}>
-            Submit
-          </button>
-          <button
-            onClick={() => setAnswer('not sure')}
-            style={S.btnSecondary}
-            disabled={isSubmitting}
-          >
-            I’m not sure
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => handleAnswer('Not sure')}
+              style={{ ...S.btnSecondary, flex: 1 }}
+              disabled={isSubmitting}
+            >
+              Not sure
+            </button>
+            <button onClick={() => handleAnswer()} style={{ ...S.btnPrimary, flex: 1 }} disabled={!answer.trim() || isSubmitting}>
+              Submit →
+            </button>
+          </div>
         </>
       )}
 
@@ -515,9 +582,11 @@ export default function App() {
       {/* ── COMPLETE ── */}
       {phase === 'complete' && (
         <>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <span style={S.resultBadge}>Gemini</span>
+          </div>
           <div style={{ ...S.card, padding: '10px 12px' }}>
-            <div style={S.sectionTitle}>Result</div>
-            <div style={{ fontSize: 14, fontWeight: 600, marginTop: 6 }}>Assembled prompt</div>
+            <div style={S.sectionTitle}>Assembled Prompt</div>
           </div>
           <pre style={S.pre}>{assembled}</pre>
           {scores && (
@@ -533,12 +602,14 @@ export default function App() {
           <button onClick={() => { vscode?.postMessage({ type: 'sendToTerminal', assembledPrompt: assembled }); setPhase('sent'); }} style={S.btnAccent}>
             Send to Claude Code
           </button>
-          <button onClick={() => { navigator.clipboard?.writeText(assembled); setCopied(true); setTimeout(() => setCopied(false), 2000); }} style={S.btnSecondary}>
-            {copied ? '✓ Copied!' : 'Copy to clipboard'}
-          </button>
-          <button onClick={reset} style={{ ...S.btnSecondary, color: C.muted, borderColor: 'transparent' }}>
-            New session
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => { navigator.clipboard?.writeText(assembled); setCopied(true); setTimeout(() => setCopied(false), 2000); }} style={{ ...S.btnSecondary, flex: 1 }}>
+              {copied ? '✓ Copied!' : '📋 Copy'}
+            </button>
+            <button onClick={reset} style={{ ...S.btnSecondary, flex: 1 }}>
+              New session
+            </button>
+          </div>
         </>
       )}
 
