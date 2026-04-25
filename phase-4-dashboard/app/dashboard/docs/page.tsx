@@ -14,7 +14,7 @@ export default function DocsPage() {
         <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 mb-8">
           PromptOS Documentation
         </h1>
-        
+
         <p className="text-[var(--text-secondary)] text-lg mb-12">
           Welcome to the PromptOS documentation. Here you will find everything you need to know about setting up and using the PromptOS CLI and browser extensions.
         </p>
@@ -51,7 +51,7 @@ export default function DocsPage() {
             </p>
             <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-2 mt-6">Installation (Developer Mode)</h3>
             <ol className="list-decimal list-inside text-[var(--text-secondary)] space-y-3 mb-6">
-              <li>Download the extension from the <a href="https://github.com/promptos/releases" className="text-blue-400 hover:underline">Releases Page</a>.</li>
+              <li>Download the extension from the <a href="https://github.com/fatbomb/PromptOs" className="text-blue-400 hover:underline">Releases Page</a>.</li>
               <li>Extract the downloaded <code>.zip</code> file.</li>
               <li>Open Chrome and navigate to <code>chrome://extensions/</code>.</li>
               <li>Enable <strong>Developer mode</strong> in the top right corner.</li>
@@ -67,7 +67,7 @@ export default function DocsPage() {
             </p>
             <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-2 mt-6">Installation (VSIX)</h3>
             <ol className="list-decimal list-inside text-[var(--text-secondary)] space-y-3 mb-6">
-              <li>Download the <code>.vsix</code> file from the <a href="https://github.com/promptos/releases" className="text-blue-400 hover:underline">Releases Page</a>.</li>
+              <li>Download the <code>.vsix</code> file from the <a href="https://github.com/fatbomb/PromptOs" className="text-blue-400 hover:underline">Releases Page</a>.</li>
               <li>Open VS Code and navigate to the Extensions view (<kbd className="bg-white/10 px-1 rounded">Ctrl+Shift+X</kbd>).</li>
               <li>Click the <code>...</code> menu in the top right corner.</li>
               <li>Select <strong>Install from VSIX...</strong> and choose the downloaded file.</li>
