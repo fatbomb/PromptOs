@@ -13,8 +13,7 @@
   ],
   "externally_connectable": {
     "matches": [
-      "https://prompt-os-dashboard.vercel.app/*",
-      "http://localhost:3001/*"
+      "https://prompt-os-dashboard.vercel.app/*"
     ]
   },
   "background": {

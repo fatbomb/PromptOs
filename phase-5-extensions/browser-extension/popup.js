@@ -19,7 +19,7 @@ chrome.storage.local.get('promptos_jwt', (result) => {
       const payload = JSON.parse(atob(token.split('.')[1]));
       if (payload.exp * 1000 > Date.now()) {
         btn.textContent = '✓ Logged in — Open Dashboard →';
-        btn.href = 'http://https://prompt-os-dashboard.vercel.app/dashboard';
+        btn.href = 'https://prompt-os-dashboard.vercel.app/dashboard';
         status.style.display = 'block';
         return;
       } else {
@@ -46,7 +46,7 @@ btn.addEventListener('click', (e) => {
     btn.style.pointerEvents = 'auto';
     if (res && res.ok) {
       btn.textContent = '✓ Logged in — Open Dashboard →';
-      btn.href = 'http://https://prompt-os-dashboard.vercel.app/dashboard';
+      btn.href = 'https://prompt-os-dashboard.vercel.app/dashboard';
       status.style.display = 'block';
     } else {
       errorEl.textContent = 'Login timed out. Try again.';
