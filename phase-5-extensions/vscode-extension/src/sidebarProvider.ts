@@ -202,7 +202,7 @@ export class PromptosSidebarProvider implements vscode.WebviewViewProvider {
     content="default-src 'none';
              script-src 'nonce-${nonce}';
              style-src 'unsafe-inline';
-             connect-src https://prompt-os-dusky.vercel.app https://prompt-os-dashboard.vercel.app http://localhost:8000 http://localhost:3000;
+             connect-src https://prompt-os-dusky.vercel.app https://prompt-os-dashboard.vercel.app https://khxmezrvzhytrxpkitsi.supabase.co;
              img-src data:;" />
   <title>PromptOS</title>
   <style>

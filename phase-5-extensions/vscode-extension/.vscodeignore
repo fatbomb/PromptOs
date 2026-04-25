@@ -1,0 +1,15 @@
+# Exclude source files (compiled output in out/ is sufficient)
+src/
+tsconfig*.json
+.vscode/
+
+# Exclude dev dependencies and package manager files
+node_modules/
+package-lock.json
+
+# Exclude old VSIX files
+*.vsix
+
+# Exclude misc
+.gitignore
+.eslintrc*
