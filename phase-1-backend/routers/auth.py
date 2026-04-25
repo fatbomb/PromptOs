@@ -7,10 +7,12 @@ Endpoints:
 """
 
 import os
+import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 router = APIRouter()
+logger = logging.getLogger("promptos.auth")
 
 # Temporary in-memory store for CLI token handoff
 # Key: state string, Value: JWT token
@@ -25,6 +27,7 @@ class StoreTokenRequest(BaseModel):
 @router.post("/cli-token")
 async def store_cli_token(req: StoreTokenRequest):
     """Dashboard callback stores JWT here after successful OAuth."""
+    logger.info(f"Storing CLI token for state: {req.state}")
     _cli_token_store[req.state] = req.token
     return {"stored": True}
 
@@ -37,7 +40,10 @@ async def get_cli_token(state: str):
     """
     token = _cli_token_store.pop(state, None)
     if not token:
+        logger.debug(f"Token not ready yet for state: {state}")
         raise HTTPException(status_code=404, detail="Token not ready yet")
+    
+    logger.info(f"Token successfully retrieved by CLI for state: {state}")
     return {"token": token}
 
 
@@ -49,4 +55,6 @@ async def verify_token(user=Depends(get_current_user)):
     """
     Verifies the given JWT token is still valid.
     """
-    return {"valid": True, "user_id": user["sub"]}
+    user_id = user.get("sub")
+    logger.info(f"Token verified successfully for user: {user_id}")
+    return {"valid": True, "user_id": user_id}

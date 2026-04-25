@@ -20,7 +20,7 @@ import {
   colors,
 } from '../utils/ui.js';
 
-const API           = process.env.PROMPTOS_API_BASE_URL  || 'https://prompt-os-dusky.vercel.app';
+const API = process.env.PROMPTOS_API_BASE_URL || 'https://prompt-os-dusky.vercel.app';
 const DASHBOARD_URL = process.env.PROMPTOS_DASHBOARD_URL || 'http://localhost:3000';
 
 export async function loginCommand() {
@@ -29,6 +29,7 @@ export async function loginCommand() {
   // Check if user is already logged in
   const existingToken = await getToken();
   if (existingToken) {
+    console.log('🔑 Existing token found:', existingToken);
     const verifySpinner = createSpinner('Checking existing session…').start();
     try {
       const verifyRes = await fetch(`${API}/auth/verify`, {
@@ -50,7 +51,7 @@ export async function loginCommand() {
     }
   }
 
-  const state    = crypto.randomBytes(16).toString('hex');
+  const state = crypto.randomBytes(16).toString('hex');
   const loginUrl = `${DASHBOARD_URL}/login?state=${state}`;
 
   printPanel(
