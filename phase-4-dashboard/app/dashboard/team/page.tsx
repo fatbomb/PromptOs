@@ -215,17 +215,14 @@ export default async function TeamPage({ searchParams }: { searchParams: { teamI
             </div>
           </div>
         ) : (
-<<<<<<< Updated upstream
           <div className="text-center p-12 glass-card rounded-3xl border border-[var(--glass-border)] max-w-2xl mx-auto">
             <div className="w-20 h-20 bg-cyan-100 dark:bg-cyan-900/20 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-cyan-200 dark:border-cyan-500/20 shadow-sm dark:shadow-[0_0_30px_rgba(6,182,212,0.1)]">
                <svg className="w-10 h-10 text-cyan-600 dark:text-cyan-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-=======
-          <div className="text-center py-24 glass-card rounded-2xl border-dashed border-[var(--glass-border)]">
+            </div>
             <p className="text-xl font-medium text-[var(--text-primary)] mb-2">Solo Mode Active</p>
             <p className="text-[var(--text-secondary)]">You haven't joined a team yet. Create your own team or join an existing one to compete on AI dependency rankings.</p>
             <div className="mt-8">
               <TeamActions userId={userId} />
->>>>>>> Stashed changes
             </div>
           </div>
         )}
