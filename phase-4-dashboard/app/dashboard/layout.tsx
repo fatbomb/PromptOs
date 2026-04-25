@@ -1,9 +1,10 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
 import { useTheme } from '@/components/ThemeProvider';
 import { createBrowserClient } from '@supabase/ssr';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import GlowScrollbar from '@/components/GlowScrollbar';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -52,11 +53,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <Link
                       key={item.name}
                       href={item.href}
-                      className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                        isActive
+                      className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${isActive
                           ? 'bg-white/10 text-[var(--text-primary)] shadow-inner'
                           : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/5'
-                      }`}
+                        }`}
                     >
                       {item.name}
                     </Link>
@@ -64,9 +64,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 })}
               </div>
             </div>
-            
+
             <div className="flex items-center gap-6">
-              <button 
+              <button
                 onClick={toggleTheme}
                 className="p-2 rounded-full hover:bg-white/10 transition-all text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                 title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
@@ -92,11 +92,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Floating Gradient Pyramid */}
       <div className="fixed bottom-[-15%] right-[-8%] w-[600px] h-[600px] pointer-events-none z-0 animate-float-pyramid filter blur-[70px] opacity-25 mix-blend-multiply dark:mix-blend-screen">
-        <div 
+        <div
           className={`w-full h-full bg-gradient-to-tr ${getPyramidGradient()} transition-all duration-1000`}
           style={{ clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)' }}
         ></div>
       </div>
+
+      {/* Glow Scrollbar — page-color-matched */}
+      <GlowScrollbar />
 
       {/* Main Content Area */}
       <div className="flex-1 overflow-auto relative z-10">
