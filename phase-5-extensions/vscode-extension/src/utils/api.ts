@@ -184,31 +184,55 @@ export class ApiClient {
       'Prefer':         'return=minimal',
     };
 
+    const turnsSaved = scores.estimated_turns_saved ?? 0;
+
     try {
-      // Upsert skill_decay
+      // Upsert skill_decay — increment total_sessions via RPC or fetch-then-write
+      // First try to get existing row
+      const decayRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/skill_decay?user_id=eq.${userId}&week_start=eq.${weekStart}&select=total_sessions,avg_dependency_score,avg_thinking_depth`,
+        { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` } }
+      );
+      const existing = decayRes.ok ? await decayRes.json() : [];
+      const prev = existing[0];
+      const newTotal = (prev?.total_sessions ?? 0) + 1;
+      const newDep = prev
+        ? ((prev.avg_dependency_score * prev.total_sessions) + (scores.dependency_score ?? 0)) / newTotal
+        : (scores.dependency_score ?? 0);
+      const newDepth = prev
+        ? ((prev.avg_thinking_depth * prev.total_sessions) + (scores.thinking_depth_score ?? 0)) / newTotal
+        : (scores.thinking_depth_score ?? 0);
+
       await fetch(`${SUPABASE_URL}/rest/v1/skill_decay`, {
         method: 'POST',
         headers: { ...supabaseHeaders, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
         body: JSON.stringify({
           user_id:              userId,
           week_start:           weekStart,
-          total_sessions:       1,
-          avg_dependency_score: scores.dependency_score   ?? 0,
-          avg_thinking_depth:   scores.thinking_depth_score ?? 0,
+          total_sessions:       newTotal,
+          avg_dependency_score: Math.round(newDep * 10) / 10,
+          avg_thinking_depth:   Math.round(newDepth * 10) / 10,
         }),
       });
 
-      // Upsert token_savings
-      const turnsSaved = scores.estimated_turns_saved ?? 0;
+      // Upsert token_savings — accumulate across sessions
+      const savingsRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/token_savings?user_id=eq.${userId}&week_start=eq.${weekStart}&select=estimated_turns_saved`,
+        { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}` } }
+      );
+      const prevSavings = savingsRes.ok ? await savingsRes.json() : [];
+      const prevTurns = prevSavings[0]?.estimated_turns_saved ?? 0;
+      const totalTurns = prevTurns + turnsSaved;
+
       await fetch(`${SUPABASE_URL}/rest/v1/token_savings`, {
         method: 'POST',
         headers: { ...supabaseHeaders, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
         body: JSON.stringify({
           user_id:                      userId,
           week_start:                   weekStart,
-          estimated_turns_saved:        turnsSaved,
-          estimated_wait_time_saved_min: turnsSaved * 0.67,
-          estimated_cost_saved_usd:     turnsSaved * 0.02,
+          estimated_turns_saved:        totalTurns,
+          estimated_wait_time_saved_min: totalTurns * 0.67,
+          estimated_cost_saved_usd:     totalTurns * 0.02,
         }),
       });
     } catch (e) {

@@ -35,40 +35,98 @@ const TOOLS = ['auto', 'claude', 'chatgpt', 'gemini'];
 // ---------------------------------------------------------------------------
 // JWT helper
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// JWT helper — read chrome.storage.local directly
+// ---------------------------------------------------------------------------
 async function getToken() {
     return new Promise((resolve) => {
-        chrome.storage.local.get('promptos_jwt', (result) => {
-            resolve(result.promptos_jwt ?? null);
-        });
+        try {
+            chrome.storage.local.get('promptos_jwt', (result) => {
+                resolve(result?.promptos_jwt ?? null);
+            });
+        }
+        catch {
+            resolve(null);
+        }
     });
 }
+// Listen for login success from background worker
+chrome.runtime.onMessage.addListener((msg) => {
+    if (msg.type === 'LOGIN_SUCCESS') {
+        const overlay = document.getElementById('promptos-overlay-host');
+        if (overlay) {
+            const shadow = overlay.shadowRoot;
+            if (shadow?.getElementById('promptos-login-btn')) {
+                overlay.remove();
+            }
+        }
+    }
+});
+// ---------------------------------------------------------------------------
+// API calls — routed through background service worker to bypass page CSP
+// Uses ports for long-lived connection to survive MV3 service worker restarts
+// ---------------------------------------------------------------------------
 async function apiFetch(path, body) {
-    const token = await getToken();
-    const headers = { 'Content-Type': 'application/json' };
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-    }
-    const res = await fetch(`${API_BASE}${path}`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            reject(new Error('Request timed out after 30s. Is the backend running on localhost:8000?'));
+        }, 30000);
+        try {
+            const port = chrome.runtime.connect({ name: 'api-fetch' });
+            port.onMessage.addListener((res) => {
+                clearTimeout(timeout);
+                port.disconnect();
+                if (res.error) {
+                    reject(new Error(res.error));
+                }
+                else {
+                    resolve(res.data);
+                }
+            });
+            port.onDisconnect.addListener(() => {
+                clearTimeout(timeout);
+                if (chrome.runtime.lastError) {
+                    reject(new Error(`Port disconnected: ${chrome.runtime.lastError.message}`));
+                }
+            });
+            port.postMessage({ type: 'API_FETCH', path, body });
+        }
+        catch (err) {
+            clearTimeout(timeout);
+            reject(err);
+        }
     });
-    if (!res.ok) {
-        throw new Error(`API error ${res.status}: ${await res.text()}`);
-    }
-    return res.json();
 }
 const SITES = {
     claude: {
         host: 'claude.ai',
-        inputSelector: 'div[contenteditable="true"]',
-        buttonContainer: 'fieldset',
+        // Claude uses a ProseMirror contenteditable — multiple fallback selectors
+        inputSelector: [
+            'div[contenteditable="true"].ProseMirror',
+            'div[contenteditable="true"][data-placeholder]',
+            'div[contenteditable="true"]',
+        ].join(', '),
+        buttonContainer: 'fieldset, div[data-testid="input-menu-container"], footer, form',
         toolName: 'claude',
     },
     chatgpt: {
         host: 'chat.openai.com',
-        inputSelector: 'textarea#prompt-textarea',
-        buttonContainer: 'form',
+        inputSelector: [
+            'div[contenteditable="true"]#prompt-textarea',
+            'textarea#prompt-textarea',
+            'div[contenteditable="true"]',
+        ].join(', '),
+        buttonContainer: 'div[data-testid="composer-footer"], form, div.relative.flex',
+        toolName: 'chatgpt',
+    },
+    chatgpt2: {
+        host: 'chatgpt.com',
+        inputSelector: [
+            'div[contenteditable="true"]#prompt-textarea',
+            'textarea#prompt-textarea',
+            'div[contenteditable="true"]',
+        ].join(', '),
+        buttonContainer: 'div[data-testid="composer-footer"], form, div.relative.flex',
         toolName: 'chatgpt',
     },
 };
@@ -82,7 +140,14 @@ if (!currentSite) {
 function injectButton() {
     if (document.getElementById('promptos-inject-btn'))
         return;
-    const container = document.querySelector(currentSite.buttonContainer);
+    // Try each selector in the comma-separated list
+    const selectors = currentSite.buttonContainer.split(', ');
+    let container = null;
+    for (const sel of selectors) {
+        container = document.querySelector(sel.trim());
+        if (container)
+            break;
+    }
     if (!container)
         return;
     const btn = document.createElement('button');
@@ -156,16 +221,6 @@ function openOverlay() {
 function buildCommandCenter(rawPrompt) {
     const wrapper = document.createElement('div');
     wrapper.id = 'promptos-wrapper';
-    const autoTool = currentSite.toolName;
-    const toolButtons = TOOLS.map((t) => {
-        const isActive = t === autoTool;
-        const label = t === 'auto' ? `Auto (${autoTool})` : t.charAt(0).toUpperCase() + t.slice(1);
-        return `<button class="tool-btn${isActive ? ' active' : ''}" data-tool="${t}">${label}</button>`;
-    }).join('');
-    const modeButtons = MODES.map((m, i) => {
-        const isActive = i === 0;
-        return `<button class="mode-btn${isActive ? ' active' : ''}" data-mode-id="${m.id}" data-backend-mode="${m.backendMode}" title="${m.desc}">${m.icon} ${m.label}</button>`;
-    }).join('');
     const presetChips = PRESETS.map((p, i) => `<button class="preset-chip" data-preset-idx="${i}">${p.icon} ${p.label}</button>`).join('');
     wrapper.innerHTML = `
     <div class="modal command-center">
@@ -188,51 +243,7 @@ function buildCommandCenter(rawPrompt) {
           </div>
         </div>
 
-        <!-- Context Panel -->
-        <div class="section">
-          <div class="section-header" id="promptos-context-toggle">
-            <span class="section-icon">📎</span>
-            <span class="section-label">ADD CONTEXT</span>
-            <span class="context-badge" id="promptos-context-badge" style="display:none;">0</span>
-            <span class="section-chevron collapsed">▾</span>
-          </div>
-          <div id="promptos-context-body" class="section-body" style="display:none;">
-            <div class="context-tabs">
-              <button class="ctx-tab active" data-ctx="code">📄 Code</button>
-              <button class="ctx-tab" data-ctx="error">🚨 Error Log</button>
-              <button class="ctx-tab" data-ctx="project">🏗️ Stack</button>
-            </div>
-            <div class="ctx-panel" id="promptos-ctx-code">
-              <textarea id="promptos-ctx-code-input" class="ctx-textarea" placeholder="Paste your code snippet, file contents, or relevant function here..."></textarea>
-            </div>
-            <div class="ctx-panel" id="promptos-ctx-error" style="display:none;">
-              <textarea id="promptos-ctx-error-input" class="ctx-textarea" placeholder="Paste terminal errors, stack traces, or compiler output..."></textarea>
-            </div>
-            <div class="ctx-panel" id="promptos-ctx-project" style="display:none;">
-              <input id="promptos-ctx-project-input" class="ctx-input" type="text" placeholder="e.g. Next.js 14 + Prisma + PostgreSQL + Tailwind" />
-            </div>
-          </div>
-        </div>
-
-        <!-- Mode Selector -->
-        <div class="section">
-          <div class="section-header-static">
-            <span class="section-icon">🎯</span>
-            <span class="section-label">MODE</span>
-          </div>
-          <div class="mode-grid">${modeButtons}</div>
-        </div>
-
-        <!-- Target Tool -->
-        <div class="section">
-          <div class="section-header-static">
-            <span class="section-icon">🎯</span>
-            <span class="section-label">OPTIMIZED FOR</span>
-          </div>
-          <div class="tool-grid">${toolButtons}</div>
-        </div>
-
-        <!-- Smart Presets -->
+        <!-- Quick Actions -->
         <div class="section">
           <div class="section-header-static">
             <span class="section-icon">⚡</span>
@@ -249,148 +260,107 @@ function buildCommandCenter(rawPrompt) {
     return wrapper;
 }
 function wireCommandCenter(shadow, hostDiv, inputEl, rawPrompt) {
-    // Close
-    shadow.getElementById('promptos-close-btn').addEventListener('click', () => hostDiv.remove());
-    // Prompt section toggle
-    shadow.getElementById('promptos-prompt-toggle')?.addEventListener('click', () => {
+    const closeBtn = shadow.getElementById('promptos-close-btn');
+    const startBtn = shadow.getElementById('promptos-start-btn');
+    const promptToggle = shadow.getElementById('promptos-prompt-toggle');
+    if (!closeBtn || !startBtn) {
+        // DOM not ready yet — retry once
+        setTimeout(() => wireCommandCenter(shadow, hostDiv, inputEl, rawPrompt), 50);
+        return;
+    }
+    closeBtn.addEventListener('click', () => hostDiv.remove());
+    promptToggle?.addEventListener('click', () => {
         const body = shadow.getElementById('promptos-prompt-body');
         const chevron = shadow.querySelector('#promptos-prompt-toggle .section-chevron');
+        if (!body || !chevron)
+            return;
         const isHidden = body.style.display === 'none';
         body.style.display = isHidden ? 'block' : 'none';
         chevron.classList.toggle('collapsed', !isHidden);
     });
-    // Context section toggle
-    shadow.getElementById('promptos-context-toggle')?.addEventListener('click', () => {
-        const body = shadow.getElementById('promptos-context-body');
-        const chevron = shadow.querySelector('#promptos-context-toggle .section-chevron');
-        const isHidden = body.style.display === 'none';
-        body.style.display = isHidden ? 'block' : 'none';
-        chevron.classList.toggle('collapsed', !isHidden);
-    });
-    // Context tabs
-    shadow.querySelectorAll('.ctx-tab').forEach((tab) => {
-        tab.addEventListener('click', () => {
-            const ctx = tab.dataset.ctx;
-            shadow.querySelectorAll('.ctx-tab').forEach((t) => t.classList.remove('active'));
-            tab.classList.add('active');
-            shadow.querySelectorAll('.ctx-panel').forEach((p) => p.style.display = 'none');
-            shadow.getElementById(`promptos-ctx-${ctx}`).style.display = 'block';
-        });
-    });
-    // Context badge updater
-    const updateContextBadge = () => {
-        const code = shadow.getElementById('promptos-ctx-code-input')?.value || '';
-        const error = shadow.getElementById('promptos-ctx-error-input')?.value || '';
-        const project = shadow.getElementById('promptos-ctx-project-input')?.value || '';
-        sessionConfig.contextCode = code;
-        sessionConfig.contextError = error;
-        sessionConfig.contextProject = project;
-        const count = [code, error, project].filter((v) => v.trim().length > 0).length;
-        const badge = shadow.getElementById('promptos-context-badge');
-        badge.textContent = String(count);
-        badge.style.display = count > 0 ? 'inline-flex' : 'none';
-    };
-    shadow.getElementById('promptos-ctx-code-input')?.addEventListener('input', updateContextBadge);
-    shadow.getElementById('promptos-ctx-error-input')?.addEventListener('input', updateContextBadge);
-    shadow.getElementById('promptos-ctx-project-input')?.addEventListener('input', updateContextBadge);
-    // Mode selector
-    shadow.querySelectorAll('.mode-btn').forEach((btn) => {
-        btn.addEventListener('click', () => {
-            shadow.querySelectorAll('.mode-btn').forEach((b) => b.classList.remove('active'));
-            btn.classList.add('active');
-            sessionConfig.mode = btn.dataset.backendMode;
-        });
-    });
-    // Tool selector
-    shadow.querySelectorAll('.tool-btn').forEach((btn) => {
-        btn.addEventListener('click', () => {
-            shadow.querySelectorAll('.tool-btn').forEach((b) => b.classList.remove('active'));
-            btn.classList.add('active');
-            sessionConfig.targetTool = btn.dataset.tool;
-        });
-    });
-    // Smart presets
     shadow.querySelectorAll('.preset-chip').forEach((chip) => {
         chip.addEventListener('click', () => {
             const idx = parseInt(chip.dataset.presetIdx, 10);
             const preset = PRESETS[idx];
-            // Set mode
             sessionConfig.mode = preset.mode;
-            shadow.querySelectorAll('.mode-btn').forEach((b) => {
-                const bMode = MODES.find((m) => m.backendMode === preset.mode);
-                b.classList.toggle('active', b.dataset.backendMode === preset.mode && b.dataset.modeId === bMode?.id);
-            });
-            // Expand context panel if needed
-            if (preset.contextType) {
-                const body = shadow.getElementById('promptos-context-body');
-                body.style.display = 'block';
-                shadow.querySelectorAll('.ctx-tab').forEach((t) => {
-                    t.classList.toggle('active', t.dataset.ctx === preset.contextType);
-                });
-                shadow.querySelectorAll('.ctx-panel').forEach((p) => p.style.display = 'none');
-                const panel = shadow.getElementById(`promptos-ctx-${preset.contextType}`);
-                if (panel)
-                    panel.style.display = 'block';
-            }
-            // Start session with preset prompt
             const finalPrompt = rawPrompt ? `${rawPrompt}\n\n${preset.prompt}` : preset.prompt;
-            updateContextBadge();
-            runQuestionFlow(shadow, hostDiv, inputEl, finalPrompt);
+            runQuestionFlow(shadow, hostDiv, inputEl, finalPrompt).catch((err) => {
+                setContent(shadow, errorHTML(`Error: ${err}`));
+            });
         });
     });
-    // Start button
-    shadow.getElementById('promptos-start-btn').addEventListener('click', () => {
-        updateContextBadge();
-        runQuestionFlow(shadow, hostDiv, inputEl, rawPrompt);
+    startBtn.addEventListener('click', async () => {
+        console.log('[PromptOS] Start button clicked, rawPrompt:', rawPrompt);
+        if (!rawPrompt.trim()) {
+            setContent(shadow, errorHTML('Please type a prompt in the chat input first, then click ⚡ PromptOS Copilot.'));
+            return;
+        }
+        try {
+            await runQuestionFlow(shadow, hostDiv, inputEl, rawPrompt);
+        }
+        catch (err) {
+            console.error('[PromptOS] runQuestionFlow threw:', err);
+            setContent(shadow, errorHTML(`Unexpected error: ${err}`));
+        }
     });
 }
 // ---------------------------------------------------------------------------
 // Question flow state machine
 // ---------------------------------------------------------------------------
 async function runQuestionFlow(shadow, hostDiv, inputEl, rawPrompt) {
-    setContent(shadow, loadingHTML('Starting session...'));
+    console.log('[PromptOS] runQuestionFlow started');
+    setContent(shadow, loadingHTML('Checking login...'));
     const token = await getToken();
+    console.log('[PromptOS] token exists:', !!token);
     if (!token) {
         setContent(shadow, loginHTML());
         shadow.getElementById('promptos-login-btn')?.addEventListener('click', () => {
-            window.open('http://localhost:3000/auth/login', '_blank');
-            hostDiv.remove();
+            setContent(shadow, loadingHTML('Opening login... waiting up to 60s'));
+            chrome.runtime.sendMessage({ type: 'START_LOGIN' }, (res) => {
+                if (res?.ok) {
+                    runQuestionFlow(shadow, hostDiv, inputEl, rawPrompt);
+                }
+                else {
+                    setContent(shadow, errorHTML('Login timed out. Please try again via the extension popup.'));
+                }
+            });
         });
         shadow.getElementById('promptos-close-login-btn')?.addEventListener('click', () => hostDiv.remove());
         return;
     }
-    // Build workspace context from gathered inputs
-    const workspaceContext = {};
-    if (sessionConfig.contextCode.trim())
-        workspaceContext.code_snippet = sessionConfig.contextCode;
-    if (sessionConfig.contextError.trim())
-        workspaceContext.error_log = sessionConfig.contextError;
-    if (sessionConfig.contextProject.trim())
-        workspaceContext.project_stack = sessionConfig.contextProject;
-    const resolvedTool = sessionConfig.targetTool === 'auto' ? currentSite.toolName : sessionConfig.targetTool;
+    setContent(shadow, loadingHTML('Starting session...'));
+    console.log('[PromptOS] calling /session/start');
     let sessionId;
     try {
         const startRes = await apiFetch('/session/start', {
             raw_prompt: rawPrompt,
             mode: sessionConfig.mode,
-            target_tool: resolvedTool,
-            workspace_context: Object.keys(workspaceContext).length > 0 ? workspaceContext : null,
+            target_tool: currentSite.toolName,
+            workspace_context: null,
             source: 'browser_extension',
         });
         sessionId = startRes.session_id;
+        console.log('[PromptOS] session started:', sessionId);
     }
     catch (err) {
         const errMsg = String(err);
         if (errMsg.includes('401') || errMsg.includes('403')) {
             setContent(shadow, loginHTML());
             shadow.getElementById('promptos-login-btn')?.addEventListener('click', () => {
-                window.open('http://localhost:3000/auth/login', '_blank');
-                hostDiv.remove();
+                setContent(shadow, loadingHTML('Opening login... waiting up to 60s'));
+                chrome.runtime.sendMessage({ type: 'START_LOGIN' }, (res) => {
+                    if (res?.ok) {
+                        runQuestionFlow(shadow, hostDiv, inputEl, rawPrompt);
+                    }
+                    else {
+                        setContent(shadow, errorHTML('Login timed out. Please try again via the extension popup.'));
+                    }
+                });
             });
             shadow.getElementById('promptos-close-login-btn')?.addEventListener('click', () => hostDiv.remove());
         }
         else {
-            setContent(shadow, errorHTML(`Failed to start session: ${err}`));
+            setContent(shadow, errorHTML(`Failed to start session: ${errMsg}`));
         }
         return;
     }
@@ -463,27 +433,48 @@ async function askNextQuestion(shadow, hostDiv, inputEl, sessionId, userMessage,
 function injectPrompt(inputEl, text) {
     if (!inputEl)
         return;
-    if ('value' in inputEl) {
-        inputEl.value = text;
+    if ('value' in inputEl && inputEl.tagName === 'TEXTAREA') {
+        // Standard textarea (some ChatGPT versions)
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+        nativeInputValueSetter?.call(inputEl, text);
+        inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+        inputEl.dispatchEvent(new Event('change', { bubbles: true }));
     }
     else {
-        inputEl.innerText = text;
+        // contenteditable (Claude ProseMirror, ChatGPT div)
+        inputEl.focus();
+        // Select all existing content and replace
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(inputEl);
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+        // Use execCommand for broad compatibility with rich text editors
+        document.execCommand('selectAll', false);
+        document.execCommand('insertText', false, text);
+        // Also set innerText as fallback and fire all relevant events
+        if (!inputEl.innerText.includes(text.substring(0, 20))) {
+            inputEl.innerText = text;
+        }
+        inputEl.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertText', data: text }));
+        inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+        inputEl.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
     }
-    inputEl.dispatchEvent(new Event('input', { bubbles: true }));
-    inputEl.dispatchEvent(new Event('change', { bubbles: true }));
     inputEl.focus();
 }
 // ---------------------------------------------------------------------------
 // Shadow DOM helpers
 // ---------------------------------------------------------------------------
 function setContent(shadow, html) {
-    let wrapper = shadow.getElementById('promptos-wrapper');
-    if (!wrapper) {
-        wrapper = document.createElement('div');
-        wrapper.id = 'promptos-wrapper';
-        shadow.appendChild(wrapper);
+    // Remove existing wrapper and replace entirely
+    const existing = shadow.getElementById('promptos-wrapper');
+    if (existing) {
+        existing.remove();
     }
+    const wrapper = document.createElement('div');
+    wrapper.id = 'promptos-wrapper';
     wrapper.innerHTML = html;
+    shadow.appendChild(wrapper);
 }
 // ---------------------------------------------------------------------------
 // HTML templates
@@ -1201,4 +1192,8 @@ function overlayCSS() {
 // ---------------------------------------------------------------------------
 const observer = new MutationObserver(() => injectButton());
 observer.observe(document.body, { childList: true, subtree: true });
+// Retry at multiple intervals to handle slow SPA renders
+setTimeout(injectButton, 1000);
 setTimeout(injectButton, 2000);
+setTimeout(injectButton, 4000);
+setTimeout(injectButton, 8000);

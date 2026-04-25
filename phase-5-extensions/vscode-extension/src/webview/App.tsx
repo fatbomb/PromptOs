@@ -234,16 +234,26 @@ function Spinner({ text = 'Thinking...' }: { text?: string }) {
   );
 }
 
-function isLikelyFeatureBuildPrompt(prompt: string): boolean {
+function classifyPrompt(prompt: string): 'feature_build' | 'bug_fix' | 'refactor' | 'unspecified' {
   const p = prompt.toLowerCase();
-  const intentVerb = /(build|create|develop|make|implement)/.test(p);
-  const targetNoun = /(app|application|website|platform|tool|dashboard|tracker|system|project)/.test(p);
-  return intentVerb && targetNoun;
+  const bugVerb = /(fix|crash|broken|error|bug|fail|not working|doesn't work|issue|wrong|undefined|null|exception|traceback)/.test(p);
+  if (bugVerb) return 'bug_fix';
+  const featureVerb = /(build|create|develop|make|implement|add|introduce|enable|support)/.test(p);
+  const featureNoun = /(app|application|website|platform|tool|dashboard|tracker|system|project|feature|page|component|button|modal|form)/.test(p);
+  if (featureVerb && featureNoun) return 'feature_build';
+  if (featureVerb) return 'feature_build';
+  const refactorVerb = /(refactor|clean|reorganize|restructure|simplify|optimize|improve)/.test(p);
+  if (refactorVerb) return 'refactor';
+  return 'unspecified';
+}
+
+// Keep for backward compat
+function isLikelyFeatureBuildPrompt(prompt: string): boolean {
+  return classifyPrompt(prompt) === 'feature_build';
 }
 
 function buildSessionContext(prompt: string): Record<string, unknown> {
-  const featureBuild = isLikelyFeatureBuildPrompt(prompt);
-
+  const intent = classifyPrompt(prompt);
   return {
     refinement_preferences: {
       ask_one_question_per_turn: true,
@@ -256,7 +266,7 @@ function buildSessionContext(prompt: string): Record<string, unknown> {
       ],
       avoid_for_feature_requests: ['error message', 'stack trace'],
     },
-    inferred_intent: featureBuild ? 'feature_build' : 'unspecified',
+    inferred_intent: intent,
   };
 }
 
@@ -333,10 +343,17 @@ export default function App() {
               Number(msg.turn) === 1 &&
               /^what type of request is this\??$/i.test(nextQuestion);
 
+            const promptClass = classifyPrompt(rawPrompt);
+            const autoAnswer =
+              promptClass === 'feature_build' ? 'New feature' :
+              promptClass === 'bug_fix'       ? 'Bug fix' :
+              promptClass === 'refactor'      ? 'Refactor' :
+              null;
+
             if (
               firstQuestionIsGenericCategory &&
               !autoClassifiedFirstQuestionRef.current &&
-              isLikelyFeatureBuildPrompt(rawPrompt)
+              autoAnswer !== null
             ) {
               autoClassifiedFirstQuestionRef.current = true;
               setIsSubmitting(true);
@@ -344,7 +361,7 @@ export default function App() {
               vscode?.postMessage({
                 type: 'sendMessage',
                 sessionId: sessionRef.current,
-                userMessage: 'New feature',
+                userMessage: autoAnswer,
               });
               return;
             }
@@ -526,8 +543,16 @@ export default function App() {
       {phase === 'asking' && (
         <>
           <div style={{ ...S.card, borderLeft: `3px solid ${C.primary}` }}>
-            <div style={S.sectionTitle}>Question</div>
-            <p style={{ margin: '4px 0 0', fontWeight: 600, fontSize: 13, lineHeight: 1.5 }}>{question}</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <div style={S.sectionTitle}>Question {turnNum}</div>
+              <div style={{ fontSize: 9, color: C.muted, fontWeight: 600 }}>
+                {Math.max(0, 6 - turnNum)} left
+              </div>
+            </div>
+            <div style={S.progressTrack}>
+              <div style={{ ...S.progressFill, width: `${Math.min(100, (turnNum / 6) * 100)}%` }} />
+            </div>
+            <p style={{ margin: '8px 0 0', fontWeight: 600, fontSize: 13, lineHeight: 1.5 }}>{question}</p>
           </div>
 
           {/* Options pills */}

@@ -3,14 +3,30 @@
   "name": "PromptOS",
   "version": "0.1.0",
   "description": "PromptOS Copilot — your AI coding companion for Claude and ChatGPT",
-  "permissions": ["storage", "activeTab", "scripting"],
+  "permissions": ["storage", "activeTab", "scripting", "clipboardWrite", "tabs"],
   "host_permissions": [
     "https://claude.ai/*",
-    "https://chat.openai.com/*"
+    "https://chat.openai.com/*",
+    "https://chatgpt.com/*",
+    "http://localhost:8000/*",
+    "http://localhost:3000/*"
   ],
+  "externally_connectable": {
+    "matches": [
+      "http://localhost:3000/*",
+      "http://localhost:3001/*"
+    ]
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
-      "matches": ["https://claude.ai/*", "https://chat.openai.com/*"],
+      "matches": [
+        "https://claude.ai/*",
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*"
+      ],
       "js": ["content.js"],
       "run_at": "document_idle"
     }
@@ -21,8 +37,12 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["overlay.css", "overlay.html"],
-      "matches": ["https://claude.ai/*", "https://chat.openai.com/*"]
+      "resources": ["overlay.css"],
+      "matches": [
+        "https://claude.ai/*",
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*"
+      ]
     }
   ]
 }

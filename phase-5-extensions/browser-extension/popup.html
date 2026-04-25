@@ -140,7 +140,17 @@
     <div class="site-chip"><span class="site-dot"></span>chat.openai.com</div>
   </div>
 
-  <a href="http://localhost:3000/auth/login" target="_blank" class="login-btn">Login / Dashboard →</a>
+  <a href="http://localhost:3000/auth/login" target="_blank" class="login-btn" id="login-btn">Login / Dashboard →</a>
+  <div id="login-status" style="font-size:11px;color:#10B981;text-align:center;margin-top:6px;display:none;">✓ Logged in</div>
+  <div id="login-polling" style="font-size:11px;color:#06B6D4;text-align:center;margin-top:6px;display:none;">⏳ Waiting for login...</div>
+  <div id="login-error" style="font-size:11px;color:#EF4444;text-align:center;margin-top:6px;display:none;"></div>
+
+  <div style="margin-top:10px;padding:8px;background:#0d0d14;border:1px solid #1e1b2e;border-radius:6px;">
+    <div style="font-size:9px;color:#4B5563;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Extension ID</div>
+    <div id="ext-id" style="font-size:10px;color:#6B7280;font-family:monospace;word-break:break-all;cursor:pointer;" title="Click to copy"></div>
+  </div>
+
+  <script src="popup.js"></script>
 
   <div class="status">Backend: <span>localhost:8000</span></div>
 </body>
