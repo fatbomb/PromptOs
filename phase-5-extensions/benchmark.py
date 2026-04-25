@@ -15,7 +15,7 @@ import time
 import httpx
 import re
 
-BASE = "http://localhost:8000"
+BASE = "https://prompt-os-dusky.vercel.app"
 TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxODA4NjQxMTE3LCJzdWIiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJlbWFpbCI6ImRldkBleGFtcGxlLmNvbSIsInJvbGUiOiJhdXRoZW50aWNhdGVkIn0.oMzu3WUbEmZ_8SrYWm20Evo2LXn85VfPerllkd5Jq0I"
 HEADERS = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}
 

@@ -104,7 +104,7 @@ ANTHROPIC_API_KEY=               # fallback only
 GROQ_API_KEY=                    # fallback only
 
 # CLI
-PROMPTOS_API_BASE_URL=http://localhost:8000
+PROMPTOS_API_BASE_URL=https://prompt-os-dusky.vercel.app
 
 # Dashboard (Next.js)
 NEXT_PUBLIC_SUPABASE_URL=

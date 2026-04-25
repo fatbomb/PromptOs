@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
 
   // CLI token handoff — store JWT so CLI can pick it up
   if (state) {
-    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://prompt-os-dusky.vercel.app';
     await fetch(`${apiBase}/auth/cli-token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

@@ -14,7 +14,7 @@ The PromptOS CLI is an interactive wrapper that helps you refine your natural la
    ```bash
    cp .env.example .env
    ```
-   *(Ensure `PROMPTOS_API_BASE_URL` points to your running backend, usually `http://localhost:8000`)*
+   *(Ensure `PROMPTOS_API_BASE_URL` points to your running backend, usually `https://prompt-os-dusky.vercel.app`)*
 
 ## Authentication (Development)
 

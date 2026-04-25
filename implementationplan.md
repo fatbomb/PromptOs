@@ -74,7 +74,7 @@ PromptOS is a prompt refinement layer that sits in front of any AI coding assist
 
 | # | Task | Details | Test | Time | Owner |
 |---|---|---|---|---|---|
-| 1.1 | FastAPI skeleton + health check + CORS | Set up `main.py`, register routers, configure CORS for `localhost:3000`. Add `/health` endpoint returning `{"status":"ok"}`. | `curl http://localhost:8000/health` returns 200 | 45 min | |
+| 1.1 | FastAPI skeleton + health check + CORS | Set up `main.py`, register routers, configure CORS for `localhost:3000`. Add `/health` endpoint returning `{"status":"ok"}`. | `curl https://prompt-os-dusky.vercel.app/health` returns 200 | 45 min | |
 | 1.2 | Supabase project + Google OAuth | Create Supabase project. Enable Google OAuth in Auth settings. Set redirect URL to `http://localhost:3000/auth/callback`. Copy `SUPABASE_URL` and `ANON_KEY`. Create JWT verify middleware in FastAPI using `SUPABASE_JWT_SECRET`. | Hit any protected endpoint without token → 401. With valid Supabase JWT → passes. | 1 hr | |
 | 1.3 | Gemini Flash conversational classifier | Use **Google Gemini Flash 2.0** (free tier, 1M tokens/day). When user sends a prompt, call Gemini Flash with a system prompt that: (1) classifies the prompt category, (2) decides what single question to ask next based on what's already been answered. Pass full conversation history each turn. Model outputs JSON: `{"question": "...", "done": false}` or `{"done": true, "assembled_prompt": "..."}` when enough context is gathered. | Send raw prompt `"fix my auth bug"` → model asks ≥3 questions over multiple turns → returns assembled prompt. | 2.5 hrs | |
 | 1.4 | Session state management (in-memory + DB) | `POST /session/start` → returns `session_id`. `POST /session/message` → accepts `{session_id, user_message}`, appends to conversation history, calls Gemini, returns next question or assembled prompt. Store full conversation history per session in `sessions` table. | Start session → send 4 messages → confirm conversation history preserved → assembled prompt returned. | 1.5 hrs | |
@@ -397,7 +397,7 @@ ANTHROPIC_API_KEY=               # fallback only
 GROQ_API_KEY=                    # fallback only
 
 # CLI
-PROMPTOS_API_BASE_URL=http://localhost:8000
+PROMPTOS_API_BASE_URL=https://prompt-os-dusky.vercel.app
 
 # Dashboard (Next.js)
 NEXT_PUBLIC_SUPABASE_URL=

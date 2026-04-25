@@ -88,7 +88,7 @@ promptos-cli/
 ## Environment Variables
 
 ```env
-PROMPTOS_API_BASE_URL=http://localhost:8000
+PROMPTOS_API_BASE_URL=https://prompt-os-dusky.vercel.app
 ```
 
 ---

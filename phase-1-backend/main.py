@@ -45,5 +45,5 @@ app.include_router(quiz.router, tags=["quiz"])
 # ---------------------------------------------------------------------------
 @app.get("/health")
 async def health():
-    """Task 1.1 — curl http://localhost:8000/health → {"status":"ok"}"""
+    """Task 1.1 — curl https://prompt-os-dusky.vercel.app/health → {"status":"ok"}"""
     return {"status": "ok"}

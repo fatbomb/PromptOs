@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { getToken } from './utils/auth.js';
 
-const API = process.env.PROMPTOS_API_BASE_URL || 'http://localhost:8000';
+const API = process.env.PROMPTOS_API_BASE_URL || 'https://prompt-os-dusky.vercel.app';
 
 async function runTests() {
   console.log(chalk.bold.cyan('🧪 Running PromptOS CLI Diagnostics...\n'));
@@ -11,7 +11,7 @@ async function runTests() {
   if (process.env.PROMPTOS_API_BASE_URL) {
     console.log(chalk.green('   ✓ PROMPTOS_API_BASE_URL is set'));
   } else {
-    console.log(chalk.dim('   ℹ PROMPTOS_API_BASE_URL not set in ENV, defaulting to http://localhost:8000'));
+    console.log(chalk.dim('   ℹ PROMPTOS_API_BASE_URL not set in ENV, defaulting to https://prompt-os-dusky.vercel.app'));
   }
 
   // Test 2: Backend Health

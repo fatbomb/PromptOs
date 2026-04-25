@@ -20,7 +20,7 @@ import {
   colors,
 } from '../utils/ui.js';
 
-const API           = process.env.PROMPTOS_API_BASE_URL  || 'http://localhost:8000';
+const API           = process.env.PROMPTOS_API_BASE_URL  || 'https://prompt-os-dusky.vercel.app';
 const DASHBOARD_URL = process.env.PROMPTOS_DASHBOARD_URL || 'http://localhost:3000';
 
 export async function loginCommand() {

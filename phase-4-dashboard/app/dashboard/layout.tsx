@@ -62,6 +62,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: 'Skill Decay', href: '/dashboard/decay' },
     { name: 'Team', href: '/dashboard/team' },
     { name: 'Quiz', href: '/dashboard/quiz' },
+    { name: 'Docs', href: '/dashboard/docs' },
   ];
 
   const [contentVisible, setContentVisible] = useState(false);

@@ -2,7 +2,7 @@
  * PromptOS Background Service Worker
  */
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = 'https://prompt-os-dusky.vercel.app';
 const DASHBOARD_BASE = 'http://localhost:3000';
 
 // ---------------------------------------------------------------------------

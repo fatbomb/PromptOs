@@ -190,7 +190,7 @@ async def test_health_endpoint() -> bool:
     try:
         import httpx
         async with httpx.AsyncClient() as client:
-            r = await client.get("http://localhost:8000/health", timeout=3)
+            r = await client.get("https://prompt-os-dusky.vercel.app/health", timeout=3)
         ok = r.status_code == 200 and r.json().get("status") == "ok"
         print(f"  GET /health → {r.status_code} {r.json()}")
         print(f"  {PASS if ok else FAIL}")

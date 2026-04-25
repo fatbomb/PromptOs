@@ -27,7 +27,7 @@ import {
 } from '../utils/ui.js';
 import { ensureAuth } from '../utils/ensure-auth.js';
 
-const API = process.env.PROMPTOS_API_BASE_URL || 'http://localhost:8000';
+const API = process.env.PROMPTOS_API_BASE_URL || 'https://prompt-os-dusky.vercel.app';
 
 export async function askCommand(rawPrompt, options, targetTool = null) {
   const token = await ensureAuth();

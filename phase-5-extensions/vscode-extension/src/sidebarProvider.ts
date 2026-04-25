@@ -27,7 +27,7 @@ export class PromptosSidebarProvider implements vscode.WebviewViewProvider {
   constructor(private readonly _context: vscode.ExtensionContext) {
     this._apiBase = vscode.workspace
       .getConfiguration('promptos')
-      .get<string>('apiUrl', 'http://localhost:8000');
+      .get<string>('apiUrl', 'https://prompt-os-dusky.vercel.app');
     this._dashboardBase = this._apiBase.replace('8000', '3000');
     this._api = new ApiClient(this._apiBase, _context.secrets);
   }
@@ -200,7 +200,7 @@ export class PromptosSidebarProvider implements vscode.WebviewViewProvider {
     content="default-src 'none';
              script-src 'nonce-${nonce}';
              style-src 'unsafe-inline';
-             connect-src http://localhost:8000 http://localhost:3000;
+             connect-src https://prompt-os-dusky.vercel.app http://localhost:3000;
              img-src data:;" />
   <title>PromptOS</title>
   <style>

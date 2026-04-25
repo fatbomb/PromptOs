@@ -8,7 +8,7 @@
     "https://claude.ai/*",
     "https://chat.openai.com/*",
     "https://chatgpt.com/*",
-    "http://localhost:8000/*",
+    "https://prompt-os-dusky.vercel.app/*",
     "http://localhost:3000/*"
   ],
   "externally_connectable": {

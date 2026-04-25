@@ -8,7 +8,7 @@
  *
  * Command Center → Context + Mode + Tool → Question Flow → Inject
  */
-const API_BASE = 'http://localhost:8000';
+const API_BASE = 'https://prompt-os-dusky.vercel.app';
 let sessionConfig = {
     mode: 'default',
     targetTool: 'auto',
@@ -73,7 +73,7 @@ async function apiFetch(path, body) {
     return new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
             console.error(`[PromptOS] apiFetch timeout: ${path}`);
-            reject(new Error('Request timed out after 30s. Is the backend running on localhost:8000?'));
+            reject(new Error('Request timed out after 30s. Is the backend running on prompt-os-dusky.vercel.app?'));
         }, 30000);
         try {
             const port = chrome.runtime.connect({ name: 'api-fetch' });
@@ -721,7 +721,7 @@ function errorHTML(msg) {
       <div class="modal-body">
         <div class="error-card">
           <p class="error-msg">⚠️ ${escapeHtml(msg)}</p>
-          <p class="hint">Make sure the PromptOS backend is running on localhost:8000.</p>
+          <p class="hint">Make sure the PromptOS backend is running on prompt-os-dusky.vercel.app.</p>
         </div>
       </div>
     </div>
