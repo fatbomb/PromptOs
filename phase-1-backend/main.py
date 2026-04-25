@@ -6,13 +6,22 @@ Sets up the app, registers all routers, and configures CORS.
 Run with: uvicorn main:app --reload
 """
 
+import sys
+import os
+from pathlib import Path
+
+# Ensure the directory containing main.py is on sys.path.
+# This is required for Vercel's serverless runtime, which may not add the
+# project root automatically — causing `from routers import ...` to fail.
+_root = Path(__file__).parent.resolve()
+if str(_root) not in sys.path:
+    sys.path.insert(0, str(_root))
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-import os
-from pathlib import Path
-env_path = Path(__file__).parent / ".env"
+env_path = _root / ".env"
 load_dotenv(dotenv_path=env_path)
 
 from routers import session, refusal, tokens, auth, quiz
@@ -24,7 +33,12 @@ app = FastAPI(title="PromptOS API", version="1.0.0")
 # ---------------------------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://prompt-os-dusky.vercel.app",
+        # Add your dashboard Vercel URL here if different
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
