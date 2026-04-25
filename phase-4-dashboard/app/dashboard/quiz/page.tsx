@@ -1,6 +1,6 @@
+import QuizList from '@/components/QuizList';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import QuizList from '@/components/QuizList';
 
 export default async function QuizPage() {
   const cookieStore = cookies();
@@ -11,7 +11,7 @@ export default async function QuizPage() {
     {
       cookies: {
         getAll: () => cookieStore.getAll(),
-        setAll: () => {},
+        setAll: () => { },
       },
     }
   );

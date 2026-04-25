@@ -107,10 +107,12 @@ function LoginForm() {
               body: JSON.stringify({ state, token: data.session.access_token }),
             }).catch(() => { });
 
-            router.refresh();
+            // Clear intro flag so animation plays after login
+            sessionStorage.removeItem('promptos-intro-played');
             router.push('/dashboard?cli_login=success');
           } else {
-            router.refresh();
+            // Clear intro flag so animation plays after login
+            sessionStorage.removeItem('promptos-intro-played');
             router.push('/dashboard');
           }
         }

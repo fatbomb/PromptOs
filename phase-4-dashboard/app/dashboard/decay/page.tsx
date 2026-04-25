@@ -1,6 +1,6 @@
+import SkillDecayChart from '@/components/SkillDecayChart';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import SkillDecayChart from '@/components/SkillDecayChart';
 
 export default async function DecayPage() {
   const cookieStore = cookies();
@@ -11,7 +11,7 @@ export default async function DecayPage() {
     {
       cookies: {
         getAll: () => cookieStore.getAll(),
-        setAll: () => {},
+        setAll: () => { },
       },
     }
   );
@@ -43,7 +43,7 @@ export default async function DecayPage() {
         {decayData && decayData.length > 0 ? (
           <div className="animate-fade-in-up">
             <SkillDecayChart data={decayData} />
-            
+
             <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="glass-card p-6 rounded-2xl border-[var(--glass-border)]">
                 <h3 className="text-lg font-bold text-[var(--text-primary)] mb-2">Refusal Engine Performance</h3>

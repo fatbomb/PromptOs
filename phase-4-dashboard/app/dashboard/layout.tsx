@@ -2,10 +2,13 @@
 
 import { useTheme } from '@/components/ThemeProvider';
 import { createBrowserClient } from '@supabase/ssr';
+import Lottie from 'lottie-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import GlowScrollbar from '@/components/GlowScrollbar';
+import DashboardIntro from '@/components/DashboardIntro';
 import { useEffect, useRef, useState } from 'react';
+import foxAnimation from '@/components/happy-fox.json';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -14,6 +17,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const supabase = createBrowserClient(
@@ -42,9 +46,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, []);
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    if (signingOut) return;
+    setSigningOut(true);
+    setDropdownOpen(false);
+    // Navigate immediately for instant feedback, sign out in background
     router.push('/login');
-    router.refresh();
+    supabase.auth.signOut();
   };
 
   const initials = displayName ? displayName.slice(0, 2).toUpperCase() : 'U';
@@ -57,6 +64,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: 'Quiz', href: '/dashboard/quiz' },
   ];
 
+  const [contentVisible, setContentVisible] = useState(false);
+
+  useEffect(() => {
+    if (sessionStorage.getItem('promptos-intro-played')) {
+      setContentVisible(true);
+    } else {
+      // Overlay starts fading at 72% of 2s = 1.44s
+      const t = setTimeout(() => setContentVisible(true), 1440);
+      return () => clearTimeout(t);
+    }
+  }, []);
+
   const getPyramidGradient = () => {
     if (pathname === '/dashboard/knowledge') return 'from-emerald-500 via-teal-500 to-cyan-500';
     if (pathname === '/dashboard/decay') return 'from-amber-500 via-orange-500 to-red-500';
@@ -66,15 +85,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen flex flex-col font-sans transition-colors duration-300 bg-[var(--bg-color)] text-[var(--text-primary)]">
+      <DashboardIntro />
       {/* Top Navigation */}
-      <nav className="sticky top-0 z-50 bg-white/30 dark:bg-[#0f172a]/30 backdrop-blur-2xl">
+      <nav
+        className="sticky top-0 z-50 bg-white/30 dark:bg-[#0f172a]/30 backdrop-blur-2xl"
+        style={{
+          opacity: contentVisible ? 1 : 0,
+          transition: 'opacity 600ms ease-in-out',
+        }}
+      >
         <div className="max-w-7xl mx-auto px-6 md:px-12">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-8">
+            <div className="flex items-center gap-12">
               <span className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">
                 PromptOS
               </span>
-              <div className="hidden md:flex space-x-1">
+              <div className="hidden md:flex space-x-1 pl-4">
                 {navItems.map((item) => {
                   const isActive = pathname === item.href;
                   return (
@@ -123,32 +149,37 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </button>
 
                 {dropdownOpen && (
-                  <div className="absolute right-0 mt-3 w-64 rounded-2xl border border-[var(--glass-border)] bg-white/90 dark:bg-[#0f172a]/95 backdrop-blur-xl shadow-2xl z-50 overflow-hidden animate-fade-in-up">
-                    {/* Profile */}
-                    <div className="px-5 py-4 flex items-center gap-3 border-b border-[var(--glass-border)]">
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-lg font-bold shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-                        </svg>
+                  <div className="absolute left-1/2 -translate-x-1/2 top-full pt-3 z-50">
+                  <div className="w-80 rounded-2xl border border-[var(--glass-border)] bg-white/90 dark:bg-[#0f172a]/95 backdrop-blur-xl shadow-md overflow-hidden animate-fade-in-up">
+                    {/* Profile + Sign Out in one row */}
+                    <div className="px-5 py-5 flex items-center gap-4">
+                      <div className="w-14 h-14 rounded-full overflow-hidden bg-transparent shrink-0 flex items-center justify-center">
+                        <Lottie animationData={foxAnimation} loop autoplay style={{ width: 64, height: 64 }} />
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-xs text-[var(--text-secondary)] mb-0.5">Hi, <span className="text-[var(--text-primary)] font-bold">{displayName}</span> 👋</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-[var(--text-secondary)] mb-0.5">Hi, <span className="text-[var(--text-primary)] font-bold">{displayName}</span> 👋</p>
                         <p className="text-xs text-[var(--text-secondary)] truncate">{userEmail}</p>
                       </div>
-                    </div>
-
-                    {/* Sign out */}
-                    <div className="px-3 py-3">
+                      {/* Sign out icon button */}
                       <button
                         onClick={handleSignOut}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-500 hover:bg-red-500/10 transition-all text-sm font-semibold"
+                        disabled={signingOut}
+                        title="Sign Out"
+                        className="shrink-0 p-2 rounded-xl text-red-500 hover:bg-red-500/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
-                        Sign Out
+                        {signingOut ? (
+                          <svg className="animate-spin w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                          </svg>
+                        ) : (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                          </svg>
+                        )}
                       </button>
                     </div>
+                  </div>
                   </div>
                 )}
               </div>
@@ -169,7 +200,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <GlowScrollbar />
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-auto relative z-10">
+      <div
+        className="flex-1 overflow-auto relative z-10"
+        style={{
+          opacity: contentVisible ? 1 : 0,
+          transition: 'opacity 600ms ease-in-out',
+        }}
+      >
         {children}
       </div>
     </div>

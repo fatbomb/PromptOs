@@ -1,14 +1,14 @@
+import AISelfAwarenessCard from '@/components/AISelfAwarenessCard';
+import CLILoginToast from '@/components/CLILoginToast';
+import ExtensionSync from '@/components/ExtensionSync';
+import KnowledgeDashboard from '@/components/KnowledgeDashboard';
+import MetricCard from '@/components/MetricCard';
+import PromptQualityChart from '@/components/PromptQualityChart';
+import SessionTable from '@/components/SessionTable';
+import SkillDecayChart from '@/components/SkillDecayChart';
+import WeeklyTrendChart from '@/components/WeeklyTrendChart';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import MetricCard from '@/components/MetricCard';
-import AISelfAwarenessCard from '@/components/AISelfAwarenessCard';
-import SessionTable from '@/components/SessionTable';
-import WeeklyTrendChart from '@/components/WeeklyTrendChart';
-import ExtensionSync from '@/components/ExtensionSync';
-import CLILoginToast from '@/components/CLILoginToast';
-import KnowledgeDashboard from '@/components/KnowledgeDashboard';
-import SkillDecayChart from '@/components/SkillDecayChart';
-import PromptQualityChart from '@/components/PromptQualityChart';
 
 
 export default async function DashboardPage() {
@@ -20,7 +20,7 @@ export default async function DashboardPage() {
     {
       cookies: {
         getAll: () => cookieStore.getAll(),
-        setAll: () => {},
+        setAll: () => { },
       },
     }
   );
@@ -76,7 +76,7 @@ export default async function DashboardPage() {
     .order('day', { ascending: false })
     .limit(30);
 
-    
+
   const latestSavings = savings?.[0];
   const totalSessions = sessions?.length ?? 0;
 
@@ -84,7 +84,7 @@ export default async function DashboardPage() {
     <main className="relative min-h-screen pt-12 pb-6 md:pt-24 md:pb-12 overflow-hidden font-sans transition-colors duration-300">
       <CLILoginToast />
       <ExtensionSync />
-      
+
       <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-12">
         <header className="mb-14">
           <h1 className="text-5xl md:text-7xl font-black tracking-tighter mb-4 leading-tight">
@@ -93,17 +93,17 @@ export default async function DashboardPage() {
             </span>
           </h1>
           <p className="text-[var(--text-secondary)] font-medium tracking-wide flex items-center gap-2">
-             <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-             AI Dependency Metrics Active
+            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+            AI Dependency Metrics Active
           </p>
         </header>
 
         {/* Metric cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           <div className="animate-fade-in-up delay-100">
-            <AISelfAwarenessCard 
-              score={sessions?.[0]?.ai_self_awareness_score ?? 0} 
-              sessionId={sessions?.[0]?.id} 
+            <AISelfAwarenessCard
+              score={sessions?.[0]?.ai_self_awareness_score ?? 0}
+              sessionId={sessions?.[0]?.id}
             />
           </div>
           <div className="animate-fade-in-up delay-200">
@@ -120,10 +120,10 @@ export default async function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
           {/* Weekly efficiency trend */}
           <section className="lg:col-span-2 animate-fade-in-up delay-300">
-             <div className="flex items-center justify-between mb-8">
-                <h2 className="text-3xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 animate-gradient">Efficiency Trend</h2>
-                <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-[0.2em] bg-[var(--glass-card-bg)] px-4 py-1.5 rounded-full border border-[var(--glass-card-border)]">7 Day Trailing</span>
-             </div>
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-3xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 animate-gradient">Efficiency Trend</h2>
+              <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-[0.2em] bg-[var(--glass-card-bg)] px-4 py-1.5 rounded-full border border-[var(--glass-card-border)]">7 Day Trailing</span>
+            </div>
             {savings && savings.length > 0 ? (
               <WeeklyTrendChart data={savings} />
             ) : (
@@ -133,9 +133,9 @@ export default async function DashboardPage() {
 
           {/* Skill decay line chart */}
           <section className="animate-fade-in-up delay-400">
-             <div className="flex items-center justify-between mb-8">
-                <h2 className="text-3xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 animate-gradient">Skill Baseline</h2>
-             </div>
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-3xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 animate-gradient">Skill Baseline</h2>
+            </div>
             {skillDecay && skillDecay.length > 0 ? (
               <SkillDecayChart data={skillDecay} />
             ) : (
@@ -146,26 +146,26 @@ export default async function DashboardPage() {
 
         {/* Prompt Quality / Improvement Section */}
         <section className="mb-12 animate-fade-in-up delay-500">
-           <div className="flex items-center justify-between mb-8">
-              <h2 className="text-3xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-500 animate-gradient">Prompt Quality Improvement</h2>
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#ef4444] opacity-60"></span>
-                  <span className="text-xs font-medium text-[var(--text-secondary)]">Raw Input</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#0ea5e9]"></span>
-                  <span className="text-xs font-medium text-[var(--text-secondary)]">Refined Quality</span>
-                </div>
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-3xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-500 animate-gradient">Prompt Quality Improvement</h2>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#ef4444] opacity-60"></span>
+                <span className="text-xs font-medium text-[var(--text-secondary)]">Raw Input</span>
               </div>
-           </div>
-           {dailyQuality && dailyQuality.length > 0 ? (
-             <PromptQualityChart data={dailyQuality} />
-           ) : (
-             <div className="h-[360px] glass-card rounded-2xl flex items-center justify-center text-[var(--text-secondary)]">
-               No quality data recorded yet.
-             </div>
-           )}
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#0ea5e9]"></span>
+                <span className="text-xs font-medium text-[var(--text-secondary)]">Refined Quality</span>
+              </div>
+            </div>
+          </div>
+          {dailyQuality && dailyQuality.length > 0 ? (
+            <PromptQualityChart data={dailyQuality} />
+          ) : (
+            <div className="h-[360px] glass-card rounded-2xl flex items-center justify-center text-[var(--text-secondary)]">
+              No quality data recorded yet.
+            </div>
+          )}
         </section>
 
 
@@ -177,7 +177,7 @@ export default async function DashboardPage() {
         {/* Session history */}
         <section className="animate-fade-in-up delay-600">
           <div className="flex items-center justify-between mb-8">
-              <h2 className="text-3xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-500 animate-gradient">Recent Telemetry</h2>
+            <h2 className="text-3xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-500 animate-gradient">Recent Telemetry</h2>
           </div>
           {sessions && sessions.length > 0 ? (
             <SessionTable sessions={sessions} />
