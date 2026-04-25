@@ -21,7 +21,9 @@ import {
 } from '../utils/ui.js';
 
 const API = process.env.PROMPTOS_API_BASE_URL || 'https://prompt-os-dusky.vercel.app';
-const DASHBOARD_URL = process.env.PROMPTOS_DASHBOARD_URL || 'https://prompt-os-dashboard.vercel.app';
+const DASHBOARD_URL = 'https://prompt-os-dashboard.vercel.app';
+// const DASHBOARD_URL = 'http://localhost:3000';
+
 
 export async function loginCommand() {
   printCompactBanner('login');

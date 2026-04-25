@@ -34,7 +34,7 @@ function LoginForm() {
       if (session) {
         if (state) {
           // Hand off token to CLI
-          const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL!;
+          const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://prompt-os-dusky.vercel.app';
           await fetch(`${apiBase}/auth/cli-token`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -100,7 +100,7 @@ function LoginForm() {
         } else {
           // CLI token handoff for email login
           if (state && data.session) {
-            const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL!;
+            const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://prompt-os-dusky.vercel.app';
             await fetch(`${apiBase}/auth/cli-token`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -293,7 +293,7 @@ export default function LoginPage() {
   useEffect(() => {
     const checkHealth = async () => {
       try {
-        const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL!;
+        const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://prompt-os-dusky.vercel.app';
         const resp = await fetch(`${apiBase}/health`, { cache: 'no-store' });
         setIsOnline(resp.ok);
       } catch (err) {

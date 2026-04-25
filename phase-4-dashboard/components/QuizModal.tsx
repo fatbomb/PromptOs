@@ -28,7 +28,7 @@ export default function QuizModal({ concept, userId, onClose }: Props) {
   useEffect(() => {
     async function loadQuiz() {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/quiz/generate`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'https://prompt-os-dusky.vercel.app'}/quiz/generate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ concept }),
@@ -50,7 +50,7 @@ export default function QuizModal({ concept, userId, onClose }: Props) {
     setSubmitting(true);
     try {
       const percentage = (finalScore / questions.length) * 100;
-      await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/quiz/submit`, {
+      await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'https://prompt-os-dusky.vercel.app'}/quiz/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
