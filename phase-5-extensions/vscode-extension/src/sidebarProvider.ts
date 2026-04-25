@@ -90,7 +90,7 @@ export class PromptosSidebarProvider implements vscode.WebviewViewProvider {
         // ── Session flow ──────────────────────────────────────────────────
         case 'startSession': {
           try {
-            const result = await this._api.startSession(msg.rawPrompt, msg.workspaceContext);
+            const result = await this._api.startSession(msg.rawPrompt, msg.workspaceContext, msg.mode);
             // Track session data for direct Supabase write
             this._sessionData.set(result.session_id, {
               rawPrompt: msg.rawPrompt,

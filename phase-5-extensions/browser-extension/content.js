@@ -233,13 +233,18 @@ function openOverlay() {
 function buildCommandCenter(rawPrompt) {
     const wrapper = document.createElement('div');
     wrapper.id = 'promptos-wrapper';
-    const presetChips = PRESETS.map((p, i) => `<button class="preset-chip" data-preset-idx="${i}">${p.icon} ${p.label}</button>`).join('');
+    // CLI-matching modes: default=full, mid=quick, skip=instant
+    const modeButtons = [
+        { id: 'default', label: '🔍 Full', desc: 'Up to 6 questions — deepest refinement', backendMode: 'default' },
+        { id: 'mid', label: '⚡ Quick', desc: 'At most 3 questions — fast refinement', backendMode: 'mid' },
+        { id: 'skip', label: '🚀 Instant', desc: 'No questions — auto-format immediately', backendMode: 'skip' },
+    ].map((m, i) => `<button class="mode-btn${i === 0 ? ' active' : ''}" data-backend-mode="${m.backendMode}" title="${m.desc}">${m.label}</button>`).join('');
     wrapper.innerHTML = `
     <div class="modal command-center">
       <div class="modal-header">
         <span class="modal-title">⚡ PromptOS Copilot</span>
-        <span class="header-badge">coding companion</span>
-        <button id="promptos-close-btn" class="close-btn">×</button>
+        <span class="header-badge">prompt refinement</span>
+        <button id="promptos-close-btn" class="close-btn" title="Close">×</button>
       </div>
       <div class="modal-body">
 
@@ -255,17 +260,21 @@ function buildCommandCenter(rawPrompt) {
           </div>
         </div>
 
-        <!-- Quick Actions -->
+        <!-- Mode Selector — matches CLI: full / quick / instant -->
         <div class="section">
           <div class="section-header-static">
-            <span class="section-icon">⚡</span>
-            <span class="section-label">QUICK ACTIONS</span>
+            <span class="section-icon">🎯</span>
+            <span class="section-label">MODE</span>
+            <span id="promptos-mode-desc" style="font-size:10px;color:#6B7280;margin-left:auto;padding-right:12px;">Up to 6 questions — deepest refinement</span>
           </div>
-          <div class="presets-grid">${presetChips}</div>
+          <div class="mode-grid">${modeButtons}</div>
         </div>
 
         <!-- Start Button -->
         <button id="promptos-start-btn" class="primary-btn glow-btn">Start Refinement →</button>
+        <div style="text-align:center;font-size:10px;color:#4B5563;margin-top:-4px;">
+          Auto-optimized for ${escapeHtml(currentSite.toolName)}
+        </div>
       </div>
     </div>
   `;
@@ -299,11 +308,7 @@ function wireCommandCenter(shadow, hostDiv, inputEl, rawPrompt) {
     const startBtn = shadow.getElementById('promptos-start-btn');
     const promptToggle = shadow.getElementById('promptos-prompt-toggle');
     if (!closeBtn || !startBtn)
-        return; // elements not ready — no-op (no more retry loop)
-    // Guard against duplicate wiring (e.g. from retry calls)
-    if (startBtn._posBound)
         return;
-    startBtn._posBound = true;
     closeBtn.addEventListener('click', () => hostDiv.remove());
     promptToggle?.addEventListener('click', () => {
         const body = shadow.getElementById('promptos-prompt-body');
@@ -314,17 +319,25 @@ function wireCommandCenter(shadow, hostDiv, inputEl, rawPrompt) {
         body.style.display = isHidden ? 'block' : 'none';
         chevron.classList.toggle('collapsed', !isHidden);
     });
-    shadow.querySelectorAll('.preset-chip').forEach((chip) => {
-        chip.addEventListener('click', () => {
-            const idx = parseInt(chip.dataset.presetIdx, 10);
-            const preset = PRESETS[idx];
-            sessionConfig.mode = preset.mode;
-            const finalPrompt = rawPrompt ? `${rawPrompt}\n\n${preset.prompt}` : preset.prompt;
-            runQuestionFlow(shadow, hostDiv, inputEl, finalPrompt).catch((err) => {
-                setContent(shadow, errorHTML(`Error: ${err}`));
-            });
+    // Mode selector — update desc label on click
+    const modeDescs = {
+        default: 'Up to 6 questions — deepest refinement',
+        mid: 'At most 3 questions — fast refinement',
+        skip: 'No questions — auto-format immediately',
+    };
+    shadow.querySelectorAll('.mode-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            shadow.querySelectorAll('.mode-btn').forEach((b) => b.classList.remove('active'));
+            btn.classList.add('active');
+            const backendMode = btn.dataset.backendMode;
+            sessionConfig.mode = backendMode;
+            const descEl = shadow.getElementById('promptos-mode-desc');
+            if (descEl)
+                descEl.textContent = modeDescs[backendMode] || '';
         });
     });
+    // Tool selector (kept for internal use, no UI)
+    sessionConfig.targetTool = currentSite.toolName;
     startBtn.addEventListener('click', async () => {
         console.log('[PromptOS] Start button clicked, rawPrompt:', rawPrompt);
         if (!rawPrompt.trim()) {
@@ -375,7 +388,7 @@ async function runQuestionFlow(shadow, hostDiv, inputEl, rawPrompt) {
         const startRes = await apiFetch('/session/start', {
             raw_prompt: rawPrompt,
             mode: sessionConfig.mode,
-            target_tool: currentSite.toolName,
+            target_tool: sessionConfig.targetTool === 'auto' ? currentSite.toolName : sessionConfig.targetTool,
             workspace_context: null,
             source: 'browser_extension',
         });
@@ -452,6 +465,7 @@ async function askNextQuestion(shadow, hostDiv, inputEl, sessionId, userMessage,
     };
     shadow.getElementById('promptos-submit-btn')?.addEventListener('click', () => submitAnswer());
     shadow.getElementById('promptos-skip-btn')?.addEventListener('click', () => submitAnswer('Skip'));
+    shadow.getElementById('promptos-cancel-session-btn')?.addEventListener('click', () => hostDiv.remove());
     options?.forEach((opt, idx) => {
         shadow.getElementById(`promptos-opt-${idx}`)?.addEventListener('click', () => submitAnswer(opt));
     });
@@ -547,7 +561,7 @@ function questionHTML(question, turn, options) {
           <span>Q${turn} of ~${maxQ}</span>
           <div class="step-dots">${dots}</div>
         </div>
-        <div style="width:24px"></div>
+        <div style="width:24px"><button id="promptos-cancel-session-btn" class="close-btn" title="Cancel session">×</button></div>
       </div>
       <div class="modal-body">
         <div class="question-card">
@@ -559,6 +573,7 @@ function questionHTML(question, turn, options) {
           <button id="promptos-skip-btn" class="secondary-btn" style="flex: 1;">Skip</button>
           <button id="promptos-submit-btn" class="primary-btn" style="flex: 2;">Submit →</button>
         </div>
+        <button id="promptos-cancel-session-btn" class="secondary-btn" style="margin-top:4px;color:#6B7280;font-size:11px;">✕ Cancel session</button>
       </div>
     </div>
   `;
@@ -581,6 +596,34 @@ function scoreBarHTML(val) {
     const filled = Math.round((val / 100) * 16);
     const bar = `<span style="color:${color}">${'█'.repeat(filled)}</span>${'░'.repeat(16 - filled)}`;
     return `<span class="score-bar">${bar}</span>`;
+}
+function receiptHTML(rawPrompt, scores) {
+    if (!scores)
+        return '';
+    const thinkingDepth = scores.thinking_depth_score ?? 0;
+    const turnsWithout = Math.max(1, 6 - Math.floor(thinkingDepth / 20));
+    const mode = sessionConfig.mode;
+    const turnsWithPromptOS = mode === 'skip' ? 0 : mode === 'mid' ? 2 : 1;
+    const timeWithout = (turnsWithout * 40 / 60).toFixed(1);
+    const timeWith = (Math.max(turnsWithPromptOS, 1) * 40 / 60).toFixed(1);
+    const timeRecovered = Math.max(0, (turnsWithout - Math.max(turnsWithPromptOS, 1)) * 40 / 60).toFixed(1);
+    const dep = scores.dependency_score ?? 0;
+    const depColor = dep < 40 ? '#10B981' : dep < 70 ? '#F59E0B' : '#EF4444';
+    const truncated = rawPrompt.length > 40 ? rawPrompt.slice(0, 37) + '…' : rawPrompt;
+    return `
+    <div class="receipt">
+      <div class="receipt-title">SESSION RECEIPT</div>
+      <div class="receipt-row"><span class="receipt-label">Prompt</span><span class="receipt-val">"${escapeHtml(truncated)}"</span></div>
+      <div class="receipt-row"><span class="receipt-label">Mode</span><span class="receipt-val">${mode}</span></div>
+      <div class="receipt-row"><span class="receipt-label">Tool</span><span class="receipt-val">${sessionConfig.targetTool === 'auto' ? currentSite.toolName : sessionConfig.targetTool}</span></div>
+      <div class="receipt-divider"></div>
+      <div class="receipt-row"><span class="receipt-label">Without PromptOS</span><span class="receipt-val">~${turnsWithout} turns · ${timeWithout} min</span></div>
+      <div class="receipt-row"><span class="receipt-label">With PromptOS</span><span class="receipt-val">${Math.max(turnsWithPromptOS, 1)} turn · ${timeWith} min</span></div>
+      <div class="receipt-row highlight"><span class="receipt-label">Time Recovered</span><span class="receipt-val" style="color:#10B981;font-weight:700;">✦ ${timeRecovered} min</span></div>
+      <div class="receipt-divider"></div>
+      <div class="receipt-row"><span class="receipt-label">AI Dependency</span><span class="receipt-val" style="color:${depColor}">${dep}/100</span></div>
+    </div>
+  `;
 }
 function completeHTML(assembled, scores) {
     const modeLabel = MODES.find((m) => m.backendMode === sessionConfig.mode)?.label || 'Default';
@@ -643,6 +686,7 @@ function completeHTML(assembled, scores) {
         <pre class="assembled-prompt">${escapeHtml(assembled)}</pre>
         ${qualityDeltaHTML}
         ${scoresHTML}
+        ${receiptHTML(assembled, scores)}
         <button id="promptos-inject-btn-confirm" class="accent-btn">Inject into chat →</button>
         <div class="action-buttons">
           <button id="promptos-copy-btn" class="secondary-btn" style="flex: 1;">📋 Copy</button>
@@ -706,7 +750,7 @@ function overlayCSS() {
       border-radius: 14px;
       width: 560px;
       max-width: 96vw;
-      max-height: 85vh;
+      max-height: 92vh;
       display: flex;
       flex-direction: column;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -1031,15 +1075,16 @@ function overlayCSS() {
       border: 1px solid #1e1b2e;
       border-left: 3px solid #10B981;
       border-radius: 8px;
-      padding: 10px 12px;
+      padding: 14px 16px;
       font-size: 12px;
       white-space: pre-wrap;
       word-break: break-word;
-      max-height: 200px;
+      max-height: 320px;
+      min-height: 120px;
       overflow-y: auto;
-      color: #6ee7b7;
-      font-family: 'Fira Code', 'Cascadia Code', monospace;
-      line-height: 1.5;
+      color: #e2e8f0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      line-height: 1.7;
     }
 
     .question-card {
@@ -1196,6 +1241,33 @@ function overlayCSS() {
       color: #6B7280;
       margin-top: 2px;
     }
+
+    .receipt {
+      background: #0d0d14;
+      border: 1px solid #1e1b2e;
+      border-left: 3px solid #10B981;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 11px;
+    }
+    .receipt-title {
+      font-size: 9px;
+      font-weight: 700;
+      color: #10B981;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 8px;
+    }
+    .receipt-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 2px 0;
+    }
+    .receipt-row.highlight { margin-top: 2px; }
+    .receipt-label { color: #6B7280; }
+    .receipt-val { color: #e2e8f0; text-align: right; }
+    .receipt-divider { height: 1px; background: #1e1b2e; margin: 6px 0; }
 
     /* ---- Quality Comparison ---- */
 

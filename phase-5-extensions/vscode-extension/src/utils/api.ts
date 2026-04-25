@@ -74,13 +74,14 @@ export class ApiClient {
     }
   }
 
-  async startSession(rawPrompt: string, workspaceContext?: object) {
+  async startSession(rawPrompt: string, workspaceContext?: object, mode?: string) {
     const res = await fetch(`${this.baseUrl}/session/start`, {
       method: 'POST',
       headers: await this._headers(),
       body: JSON.stringify({
         raw_prompt: rawPrompt,
         workspace_context: workspaceContext ?? {},
+        mode: mode ?? 'default',
         source: 'vscode',
       }),
     });
