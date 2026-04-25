@@ -137,6 +137,9 @@ async def complete_session(
     if session.get("assembled_prompt"):
         store_session_db(session)
         update_weekly_aggregates(session["user_id"], session.get("scores", {}))
+        
+        from services.supabase_client import update_daily_quality
+        update_daily_quality(session["user_id"], session.get("scores", {}))
 
     # Background: extract concepts and update concept_map (Task 3.2)
     if session.get("assembled_prompt"):

@@ -17,6 +17,7 @@ import {
   printQuestion,
   printAssembledPrompt,
   printScoreBars,
+  printQualityComparison,
   printReceipt,
   printError,
   printWarning,
@@ -175,6 +176,11 @@ export async function askCommand(rawPrompt, options, targetTool = null) {
   // ─── Step 3: Assembled prompt + scores ──────────────────────────
   if (assembled) {
     printAssembledPrompt(assembled, targetTool);
+    printQualityComparison(
+      scores?.raw_specificity_score,
+      scores?.assembled_specificity_score,
+      scores?.quality_delta
+    );
     printScoreBars(scores);
   }
 

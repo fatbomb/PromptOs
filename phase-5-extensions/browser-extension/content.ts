@@ -721,6 +721,25 @@ function completeHTML(assembled: string, scores?: Record<string, number>): strin
   const modeLabel = MODES.find((m) => m.backendMode === sessionConfig.mode)?.label || 'Default';
   const toolLabel = sessionConfig.targetTool === 'auto' ? currentSite!.toolName : sessionConfig.targetTool;
 
+  const qualityDeltaHTML = (scores && scores.raw_specificity_score !== undefined) ? `
+    <div class="quality-comparison">
+      <div class="quality-title">✦ Prompt Quality Improvement</div>
+      <div class="quality-row">
+        <span class="quality-label">Raw Prompt</span>
+        <span class="quality-val">${scores.raw_specificity_score}</span>
+        ${scoreBarHTML(scores.raw_specificity_score)}
+      </div>
+      <div class="quality-row">
+        <span class="quality-label">Refined Prompt</span>
+        <span class="quality-val highlight">${scores.assembled_specificity_score}</span>
+        ${scoreBarHTML(scores.assembled_specificity_score)}
+        <span class="quality-delta ${scores.quality_delta >= 0 ? 'plus' : 'minus'}">
+          ${scores.quality_delta >= 0 ? '+' : ''}${scores.quality_delta} ✦
+        </span>
+      </div>
+    </div>
+  ` : '';
+
   const scoresHTML = scores ? `
     <div class="scores">
       <div class="score-row">
@@ -761,6 +780,7 @@ function completeHTML(assembled: string, scores?: Record<string, number>): strin
           ${contextSummary ? `<span class="result-badge green">${contextSummary}</span>` : ''}
         </div>
         <pre class="assembled-prompt">${escapeHtml(assembled)}</pre>
+        ${qualityDeltaHTML}
         ${scoresHTML}
         <button id="promptos-inject-btn-confirm" class="accent-btn">Inject into chat →</button>
         <div class="action-buttons">
@@ -1320,6 +1340,69 @@ function overlayCSS(): string {
       color: #6B7280;
       margin-top: 2px;
     }
+
+    /* ---- Quality Comparison ---- */
+
+    .quality-comparison {
+      background: #0d0d14;
+      border: 1px solid #1e1b2e;
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .quality-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #06B6D4;
+      margin-bottom: 10px;
+    }
+
+    .quality-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .quality-label {
+      width: 90px;
+      font-size: 11px;
+      color: #9CA3AF;
+    }
+
+    .quality-val {
+      font-size: 12px;
+      font-weight: 700;
+      width: 24px;
+      text-align: right;
+      color: #e2e8f0;
+    }
+
+    .quality-val.highlight {
+      color: #06B6D4;
+    }
+
+    .quality-delta {
+      font-size: 11px;
+      font-weight: 700;
+      margin-left: 4px;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .quality-delta.plus {
+      background: #10B98115;
+      color: #10B981;
+    }
+
+    .quality-delta.minus {
+      background: #EF444415;
+      color: #EF4444;
+    }
+
 
     .refuse-card {
       background: #1a1200;

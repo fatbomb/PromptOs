@@ -21,6 +21,9 @@ def store_session_db(session_data: dict):
             "thinking_depth_score": session_data["scores"].get("thinking_depth", 0),
             "dependency_score": session_data["scores"].get("dependency_score", 50),
             "estimated_turns_saved": session_data["scores"].get("estimated_turns_saved", 0),
+            "raw_specificity_score": session_data["scores"].get("raw_specificity_score", 0),
+            "assembled_specificity_score": session_data["scores"].get("assembled_specificity_score", 0),
+            "quality_delta": session_data["scores"].get("quality_delta", 0),
             "ai_self_awareness_score": session_data["scores"].get("ai_self_awareness_score", 0),
             "was_refused": session_data.get("was_refused", False),
             "source": session_data.get("source", "cli"),
@@ -109,5 +112,37 @@ def update_weekly_aggregates(user_id: str, scores: dict):
                 "estimated_cost_saved_usd": cost_saved,
             }).execute()
             
+            
     except Exception as e:
         print(f"[supabase_client] Error updating aggregates: {e}")
+
+def update_daily_quality(user_id: str, scores: dict):
+    """Phase 4.3 — Updates the daily_quality aggregation table."""
+    try:
+        today = datetime.now().date().isoformat()
+        res = supabase.table("daily_quality").select("*").eq("user_id", user_id).eq("day", today).execute()
+        
+        raw_score = scores.get("raw_specificity_score", 0)
+        assembled_score = scores.get("assembled_specificity_score", 0)
+        delta = scores.get("quality_delta", 0)
+
+        if res.data:
+            existing = res.data[0]
+            count = existing["session_count"] + 1
+            supabase.table("daily_quality").update({
+                "session_count": count,
+                "avg_raw_score": (existing["avg_raw_score"] * existing["session_count"] + raw_score) / count,
+                "avg_assembled": (existing["avg_assembled"] * existing["session_count"] + assembled_score) / count,
+                "avg_delta": (existing["avg_delta"] * existing["session_count"] + delta) / count,
+            }).eq("id", existing["id"]).execute()
+        else:
+            supabase.table("daily_quality").insert({
+                "user_id": user_id,
+                "day": today,
+                "session_count": 1,
+                "avg_raw_score": raw_score,
+                "avg_assembled": assembled_score,
+                "avg_delta": delta,
+            }).execute()
+    except Exception as e:
+        print(f"[supabase_client] Error updating daily quality: {e}")

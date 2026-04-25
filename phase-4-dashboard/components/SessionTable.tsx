@@ -15,6 +15,8 @@ interface Session {
   dependency_score: number;
   source: string;
   was_refused: boolean;
+  raw_specificity_score?: number;
+  quality_delta?: number;
 }
 
 interface Props {
@@ -92,6 +94,13 @@ export default function SessionTable({ sessions }: Props) {
                   <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{s.assembled_token_count}</span>
                </div>
             </div>
+
+            {s.quality_delta !== undefined && (
+              <div className={`px-3 py-1.5 rounded-lg border flex flex-col items-center justify-center min-w-[70px] ${s.quality_delta > 0 ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : s.quality_delta < 0 ? 'text-rose-400 bg-rose-500/10 border-rose-500/20' : 'text-gray-400 bg-gray-500/10 border-gray-500/20'}`}>
+                <span className="text-[10px] uppercase font-bold opacity-80">Delta</span>
+                <span className="text-lg font-bold">{s.quality_delta > 0 ? `+${s.quality_delta}` : s.quality_delta} ✦</span>
+              </div>
+            )}
 
             <div className={`px-3 py-1.5 rounded-lg border flex flex-col items-center justify-center min-w-[70px] ${getScoreColor(s.thinking_depth_score, false)}`}>
               <span className="text-[10px] uppercase font-bold opacity-80">Depth</span>

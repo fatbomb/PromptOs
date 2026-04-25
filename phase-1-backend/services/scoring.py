@@ -1,12 +1,17 @@
 """
 Scoring Engine — Phase 1, Task 1.5
 
-Computes three deterministic scores after a session completes:
+Computes deterministic scores after a session completes:
   1. Token Efficiency  (0–100) — assembled_tokens / raw_tokens ratio
   2. Thinking Depth    (0–100) — how many context dimensions were filled
   3. Dependency Score  (0–100) — how many questions the user could NOT answer (lower = better)
+  4. Raw Specificity   (0–100) — Gemini-rated quality of the original raw prompt
+  5. Assembled Specificity (0–100) — Gemini-rated quality of the refined prompt
+  6. Quality Delta     (int)   — assembled_specificity - raw_specificity (the improvement)
+  7. AI Self-Awareness Score (0–100) — composite metric
 """
 
+import asyncio
 import tiktoken
 
 _encoder = tiktoken.get_encoding("cl100k_base")
@@ -26,9 +31,8 @@ async def compute_scores(
     was_refused: bool = False,
 ) -> dict:
     """
-    Task 1.5 — Returns token_efficiency, thinking_depth, dependency_score,
-    and estimated_turns_saved.
-    Also computes ai_self_awareness_score (Phase 1 update).
+    Returns all scoring metrics including the new quality delta between
+    the raw and assembled prompts.
     """
     from services.gemini import rate_specificity
 
@@ -36,7 +40,6 @@ async def compute_scores(
     assembled_tokens = _count_tokens(assembled_prompt)
 
     # 1. Token Efficiency — reward longer, richer assembled prompts
-    #    Cap at 100. If assembled < raw, score is low (prompt didn't improve).
     token_efficiency = min(100, int((assembled_tokens / max(raw_tokens, 1)) * 50))
 
     # 2. Thinking Depth — check assembled prompt for presence of each dimension
@@ -54,18 +57,20 @@ async def compute_scores(
     dependency_score = max(0, 100 - int((vague_turns / max(len(user_turns), 1)) * 100))
 
     # 4. Estimated turns saved
-    #    Formula from implementation plan: 6 - floor(thinking_depth / 20)
     estimated_turns_saved = max(0, 6 - (thinking_depth // 20))
 
-    # 5. AI Self-Awareness Score
-    specificity_score = await rate_specificity(assembled_prompt)
-    # Refusal NOT triggered penalty: if it WAS refused (they knew answer), they get 0 penalty points
-    # Wait, the prompt says "refusal_not_triggered_penalty". So if refusal NOT triggered, they get points?
-    # Or if refusal triggered, they lose points?
-    # Actually, if refusal IS triggered, they already knew the answer. Asking AI means LOW self awareness.
-    # So if they did NOT trigger refusal, they get 20 points.
+    # 5. Score both raw AND assembled quality in parallel (2 Gemini calls at once)
+    raw_specificity_score, assembled_specificity_score = await asyncio.gather(
+        rate_specificity(raw_prompt),
+        rate_specificity(assembled_prompt),
+    )
+    quality_delta = assembled_specificity_score - raw_specificity_score
+
+    # 6. AI Self-Awareness Score
     refusal_points = 0 if was_refused else 20
-    ai_self_awareness_score = int((thinking_depth * 0.4) + (specificity_score * 0.4) + refusal_points)
+    ai_self_awareness_score = int(
+        (thinking_depth * 0.4) + (assembled_specificity_score * 0.4) + refusal_points
+    )
     ai_self_awareness_score = min(100, max(0, ai_self_awareness_score))
 
     return {
@@ -75,6 +80,9 @@ async def compute_scores(
         "thinking_depth_score": thinking_depth,
         "dependency_score": dependency_score,
         "estimated_turns_saved": estimated_turns_saved,
-        "specificity_score": specificity_score,
+        "raw_specificity_score": raw_specificity_score,
+        "specificity_score": assembled_specificity_score,        # alias kept for back-compat
+        "assembled_specificity_score": assembled_specificity_score,
+        "quality_delta": quality_delta,
         "ai_self_awareness_score": ai_self_awareness_score,
     }

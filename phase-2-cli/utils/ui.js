@@ -222,6 +222,48 @@ export function printScoreBars(scores) {
 }
 
 // ─────────────────────────────────────────────
+// Quality Comparison
+// ─────────────────────────────────────────────
+export function printQualityComparison(rawScore, assembledScore, delta) {
+  if (rawScore == null || assembledScore == null) return;
+
+  const deltaStr = delta > 0 
+    ? chalk.hex(colors.accent)(`(+${delta} ✦)`) 
+    : delta < 0 
+    ? chalk.hex(colors.danger)(`(${delta} ✦)`) 
+    : chalk.hex(colors.muted)(`(0 ✦)`);
+
+  const table = new Table({
+    head: [
+      gradient(['#7C3AED', '#06B6D4'])(' Prompt Quality'),
+      chalk.hex(colors.muted)('Score'),
+      chalk.hex(colors.muted)('Bar'),
+    ],
+    style: { head: [], border: ['grey'], 'padding-left': 2, 'padding-right': 2 },
+    chars: {
+      'top':    '─', 'top-mid': '┬', 'top-left': '╭', 'top-right': '╮',
+      'bottom': '─', 'bottom-mid': '┴', 'bottom-left': '╰', 'bottom-right': '╯',
+      'left': '│', 'right': '│', 'mid': '─', 'mid-mid': '┼',
+      'left-mid': '├', 'right-mid': '┤', 'middle': '│',
+    },
+  });
+
+  table.push([
+    chalk.hex(colors.muted)('Raw prompt score'),
+    scoreLabel(rawScore) + chalk.hex(colors.muted)('/100'),
+    scoreBar(rawScore),
+  ]);
+
+  table.push([
+    chalk.hex(colors.white).bold('Refined score'),
+    scoreLabel(assembledScore) + chalk.hex(colors.muted)('/100  ') + deltaStr,
+    scoreBar(assembledScore),
+  ]);
+
+  console.log('\n' + table.toString().split('\n').map(l => '  ' + l).join('\n') + '\n');
+}
+
+// ─────────────────────────────────────────────
 // Mode announcement
 // ─────────────────────────────────────────────
 export function printModeAnnouncement(mode, targetTool = null) {

@@ -8,6 +8,8 @@ import ExtensionSync from '@/components/ExtensionSync';
 import CLILoginToast from '@/components/CLILoginToast';
 import KnowledgeDashboard from '@/components/KnowledgeDashboard';
 import SkillDecayChart from '@/components/SkillDecayChart';
+import PromptQualityChart from '@/components/PromptQualityChart';
+
 
 export default async function DashboardPage() {
   const cookieStore = cookies();
@@ -65,6 +67,15 @@ export default async function DashboardPage() {
     .eq('user_id', userId)
     .order('week_start', { ascending: false })
     .limit(12);
+
+  // Fetch daily quality for improvement chart
+  const { data: dailyQuality } = await supabase
+    .from('daily_quality')
+    .select('*')
+    .eq('user_id', userId)
+    .order('day', { ascending: false })
+    .limit(30);
+
     
   const latestSavings = savings?.[0];
   const totalSessions = sessions?.length ?? 0;
@@ -132,6 +143,31 @@ export default async function DashboardPage() {
             )}
           </section>
         </div>
+
+        {/* Prompt Quality / Improvement Section */}
+        <section className="mb-12 animate-fade-in-up delay-500">
+           <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">Prompt Quality Improvement</h2>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#ef4444] opacity-60"></span>
+                  <span className="text-xs font-medium text-[var(--text-secondary)]">Raw Input</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#0ea5e9]"></span>
+                  <span className="text-xs font-medium text-[var(--text-secondary)]">Refined Quality</span>
+                </div>
+              </div>
+           </div>
+           {dailyQuality && dailyQuality.length > 0 ? (
+             <PromptQualityChart data={dailyQuality} />
+           ) : (
+             <div className="h-[360px] glass-card rounded-2xl flex items-center justify-center text-[var(--text-secondary)]">
+               No quality data recorded yet.
+             </div>
+           )}
+        </section>
+
 
         {/* Knowledge Map Section */}
         <section className="mb-12 animate-fade-in-up delay-500">
