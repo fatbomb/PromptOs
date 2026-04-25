@@ -56,7 +56,7 @@ export default function AISelfAwarenessCard({ score, sessionId }: Props) {
       <div className="flex w-full justify-between items-start mb-2 relative z-10">
         <div>
           <h3 className="text-lg font-bold text-[var(--text-primary)] tracking-tight">AI Self-Awareness</h3>
-          <p className="text-[10px] text-[var(--text-secondary)] uppercase tracking-widest font-bold">Latest Session</p>
+          <p className="text-sm text-[var(--text-secondary)]">Latest Session</p>
         </div>
         {sessionId && (
           <button 
@@ -105,7 +105,7 @@ export default function AISelfAwarenessCard({ score, sessionId }: Props) {
           <span className={`text-4xl font-black tracking-tighter ${color}`}>
             {score > 0 ? score : '--'}
           </span>
-          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{label}</span>
+          <span className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-widest">{label}</span>
         </div>
       </div>
     </div>

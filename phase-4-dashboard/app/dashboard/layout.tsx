@@ -2,24 +2,55 @@
 
 import { useTheme } from '@/components/ThemeProvider';
 import { createBrowserClient } from '@supabase/ssr';
+<<<<<<< Updated upstream
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import GlowScrollbar from '@/components/GlowScrollbar';
+=======
+import { useEffect, useRef, useState } from 'react';
+>>>>>>> Stashed changes
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        setUserEmail(user.email ?? null);
+        setDisplayName(user.user_metadata?.display_name ?? user.email?.split('@')[0] ?? 'User');
+      }
+    });
+  }, []);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const handleSignOut = async () => {
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
     await supabase.auth.signOut();
     router.push('/login');
     router.refresh();
   };
+
+  const initials = displayName ? displayName.slice(0, 2).toUpperCase() : 'U';
 
   const navItems = [
     { name: 'Overview', href: '/dashboard' },
@@ -82,9 +113,48 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 )}
               </button>
 
-              <button onClick={handleSignOut} className="text-xs font-bold text-[var(--text-secondary)] hover:text-red-400 uppercase tracking-widest transition-colors">
-                Sign Out
-              </button>
+              {/* Profile dropdown */}
+              <div className="relative" ref={dropdownRef}>
+                <button
+                  onClick={() => setDropdownOpen(!dropdownOpen)}
+                  className="w-9 h-9 rounded-full bg-[var(--glass-card-bg)] border border-[var(--glass-border)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-blue-500/50 hover:scale-105 transition-all shadow-lg"
+                  title="Profile"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                  </svg>
+                </button>
+
+                {dropdownOpen && (
+                  <div className="absolute right-0 mt-3 w-64 rounded-2xl border border-[var(--glass-border)] bg-white/90 dark:bg-[#0f172a]/95 backdrop-blur-xl shadow-2xl z-50 overflow-hidden animate-fade-in-up">
+                    {/* Profile */}
+                    <div className="px-5 py-4 flex items-center gap-3 border-b border-[var(--glass-border)]">
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-lg font-bold shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                        </svg>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs text-[var(--text-secondary)] mb-0.5">Hi, <span className="text-[var(--text-primary)] font-bold">{displayName}</span> 👋</p>
+                        <p className="text-xs text-[var(--text-secondary)] truncate">{userEmail}</p>
+                      </div>
+                    </div>
+
+                    {/* Sign out */}
+                    <div className="px-3 py-3">
+                      <button
+                        onClick={handleSignOut}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-500 hover:bg-red-500/10 transition-all text-sm font-semibold"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        Sign Out
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
