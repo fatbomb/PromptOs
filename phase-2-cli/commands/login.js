@@ -29,7 +29,7 @@ export async function loginCommand() {
   // Check if user is already logged in
   const existingToken = await getToken();
   if (existingToken) {
-    console.log('🔑 Existing token found:', existingToken);
+    printSuccess('🔑 Existing token found:', existingToken);
     const verifySpinner = createSpinner('Checking existing session…').start();
     try {
       const verifyRes = await fetch(`${API}/auth/verify`, {
