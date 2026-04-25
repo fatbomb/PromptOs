@@ -65,11 +65,11 @@ export default function DocsPage() {
             <p className="text-[var(--text-secondary)] mb-4">
               The VS Code Extension brings PromptOS directly into your IDE, allowing you to highlight code and automatically send prompts for analysis.
             </p>
-            
+
             <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-2 mt-6">Installation (Marketplace)</h3>
             <ol className="list-decimal list-inside text-[var(--text-secondary)] space-y-3 mb-6">
               <li>Open VS Code and navigate to the Extensions view (<kbd className="bg-white/10 px-1 rounded">Ctrl+Shift+X</kbd>).</li>
-              <li>Search for <strong>PromptOS</strong> (or <code>promptos-vscode</code>).</li>
+              <li>Search for <strong>PromptOS - Prompt Refinement</strong> (or <code>promptos-vscode</code>).</li>
               <li>Click <strong>Install</strong> on the extension published by AniketJoarder.</li>
             </ol>
 
