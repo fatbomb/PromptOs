@@ -53,6 +53,17 @@ input::-webkit-credentials-auto-fill-button {
   .light .text-glow {
     text-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
   }
+
+  @keyframes gradient-move {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  .animate-gradient {
+    background-size: 200% auto;
+    animation: gradient-move 4s linear infinite;
+  }
 }
 
 body {

@@ -91,15 +91,15 @@ export default async function TeamPage({ searchParams }: { searchParams: { teamI
   }
 
   return (
-    <main className="relative min-h-screen p-6 md:p-12 overflow-hidden">
+    <main className="relative min-h-screen pt-12 pb-6 md:pt-24 md:pb-12 overflow-hidden">
       {/* Background Glow */}
       <div className="absolute top-[-10%] right-[-5%] w-[400px] h-[400px] rounded-full bg-cyan-600/10 blur-[120px] pointer-events-none"></div>
 
-      <div className="max-w-7xl mx-auto relative z-10">
+      <div className="max-w-7xl mx-auto relative z-10 px-6 md:px-12">
         <header className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
-            <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-3">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400">
+            <h1 className="text-5xl md:text-7xl font-black tracking-tighter mb-4 leading-tight">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400 animate-gradient">
                 Team Leaderboard
               </span>
             </h1>

@@ -14,9 +14,9 @@ export default function KnowledgeDashboard({ concepts, userId }: Props) {
 
   return (
     <div className="relative z-10 w-full">
-      <header className="mb-12">
-        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-3">
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400">
+      <header className="mb-14">
+        <h1 className="text-5xl md:text-7xl font-black tracking-tighter mb-4 leading-tight">
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 animate-gradient">
             Knowledge Map
           </span>
         </h1>

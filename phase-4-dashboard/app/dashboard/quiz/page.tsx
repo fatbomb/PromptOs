@@ -27,11 +27,11 @@ export default async function QuizPage() {
     .order('encounter_count', { ascending: false });
 
   return (
-    <main className="relative min-h-screen p-6 md:p-12 overflow-hidden">
-      <div className="max-w-7xl mx-auto relative z-10">
-        <header className="mb-12">
-          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-3">
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400">
+    <main className="relative min-h-screen pt-12 pb-6 md:pt-24 md:pb-12 overflow-hidden">
+      <div className="max-w-7xl mx-auto relative z-10 px-6 md:px-12">
+        <header className="mb-14">
+          <h1 className="text-5xl md:text-7xl font-black tracking-tighter mb-4 leading-tight">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 animate-gradient">
               Remediation Quizzes
             </span>
           </h1>

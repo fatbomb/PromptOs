@@ -26,8 +26,8 @@ export default async function KnowledgePage() {
     .order('encounter_count', { ascending: false });
 
   return (
-    <main className="relative min-h-screen p-6 md:p-12 overflow-hidden">
-      <div className="max-w-7xl mx-auto">
+    <main className="relative min-h-screen pt-12 pb-6 md:pt-24 md:pb-12 overflow-hidden">
+      <div className="max-w-7xl mx-auto px-6 md:px-12">
         <KnowledgeDashboard concepts={concepts || []} userId={userId} />
       </div>
     </main>

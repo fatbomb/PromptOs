@@ -68,7 +68,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="min-h-screen flex flex-col font-sans transition-colors duration-300 bg-[var(--bg-color)] text-[var(--text-primary)]">
       {/* Top Navigation */}
       <nav className="sticky top-0 z-50 bg-white/30 dark:bg-[#0f172a]/30 backdrop-blur-2xl">
-        <div className="max-w-7xl mx-auto px-6 lg:px-12">
+        <div className="max-w-7xl mx-auto px-6 md:px-12">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-8">
               <span className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">
