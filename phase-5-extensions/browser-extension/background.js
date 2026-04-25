@@ -3,7 +3,7 @@
  */
 
 const API_BASE = 'https://prompt-os-dusky.vercel.app';
-const DASHBOARD_BASE = 'http://localhost:3000';
+const DASHBOARD_BASE = 'https://prompt-os-dashboard.vercel.app';
 
 // ---------------------------------------------------------------------------
 // Message handler — login, token storage, SET_TOKEN from dashboard

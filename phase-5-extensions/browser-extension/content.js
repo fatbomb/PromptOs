@@ -710,7 +710,7 @@ function loginHTML() {
           Login via the PromptOS dashboard to use the extension
         </p>
         <button id="promptos-login-btn" class="primary-btn">Login with Google →</button>
-        <p style="font-size:10px;color:#374151;margin-top:10px;">Opens localhost:3000 in a new tab</p>
+        <p style="font-size:10px;color:#374151;margin-top:10px;">Opens https://prompt-os-dashboard.vercel.app in a new tab</p>
       </div>
     </div>
   `;

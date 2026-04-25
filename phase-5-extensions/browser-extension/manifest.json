@@ -9,11 +9,11 @@
     "https://chat.openai.com/*",
     "https://chatgpt.com/*",
     "https://prompt-os-dusky.vercel.app/*",
-    "http://localhost:3000/*"
+    "https://prompt-os-dashboard.vercel.app/*"
   ],
   "externally_connectable": {
     "matches": [
-      "http://localhost:3000/*",
+      "https://prompt-os-dashboard.vercel.app/*",
       "http://localhost:3001/*"
     ]
   },

@@ -32,7 +32,7 @@ If your backend is built with Node.js/Express, you can also deploy it to Vercel 
 
 ## 2. Handling Hardcoded URLs
 
-To avoid hardcoded URLs like `http://localhost:3000` in your CLI and Extensions, you should use Environment Variables or Configuration files.
+To avoid hardcoded URLs like `https://prompt-os-dashboard.vercel.app/` in your CLI and Extensions, you should use Environment Variables or Configuration files.
 
 ### For the Dashboard & Backend
 In `phase-4-dashboard`, you use `.env.local` for development and set environment variables in Vercel for production.
