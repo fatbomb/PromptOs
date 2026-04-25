@@ -1,5 +1,6 @@
 {
   "name": "promptos-vscode",
+  "publisher": "AniketJoarder",
   "displayName": "PromptOS",
   "description": "Prompt refinement for AI coding assistants — right in your editor",
   "version": "0.1.0",
