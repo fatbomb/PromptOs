@@ -7,8 +7,9 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import GlowScrollbar from '@/components/GlowScrollbar';
 import DashboardIntro from '@/components/DashboardIntro';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, Suspense } from 'react';
 import foxAnimation from '@/components/happy-fox.json';
+import CLILoginToast from '@/components/CLILoginToast';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -87,6 +88,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen flex flex-col font-sans transition-colors duration-300 bg-[var(--bg-color)] text-[var(--text-primary)]">
       <DashboardIntro />
+      <Suspense fallback={null}>
+        <CLILoginToast />
+      </Suspense>
       {/* Top Navigation */}
       <nav
         className="sticky top-0 z-50 bg-white/30 dark:bg-[#0f172a]/30 backdrop-blur-2xl"
