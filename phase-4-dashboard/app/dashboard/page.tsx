@@ -1,5 +1,4 @@
 import AISelfAwarenessCard from '@/components/AISelfAwarenessCard';
-import CLILoginToast from '@/components/CLILoginToast';
 import ExtensionSync from '@/components/ExtensionSync';
 import KnowledgeDashboard from '@/components/KnowledgeDashboard';
 import MetricCard from '@/components/MetricCard';
@@ -82,7 +81,6 @@ export default async function DashboardPage() {
 
   return (
     <main className="relative min-h-screen pt-12 pb-6 md:pt-24 md:pb-12 overflow-hidden font-sans transition-colors duration-300">
-      <CLILoginToast />
       <ExtensionSync />
 
       <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-12">

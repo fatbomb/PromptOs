@@ -124,6 +124,12 @@ function LoginForm() {
   };
 
   const handleGoogleLogin = async () => {
+    // Store CLI state in a cookie so it survives the OAuth roundtrip.
+    // Supabase can strip query params from redirectTo in production,
+    // so we can't rely solely on ?state= in the URL.
+    if (state) {
+      document.cookie = `promptos_cli_state=${state}; path=/; max-age=600; SameSite=Lax`;
+    }
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {

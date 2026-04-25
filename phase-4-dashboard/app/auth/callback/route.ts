@@ -7,25 +7,32 @@ import { NextRequest, NextResponse } from 'next/server';
  *
  * Handles the redirect from Supabase after Google OAuth.
  * Exchanges the code for a session, then:
- *   - If `state` param present → store JWT for CLI token handoff
+ *   - If `state` param present (URL or cookie) → store JWT for CLI token handoff
  *   - Redirect to /dashboard
  */
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const code  = url.searchParams.get('code');
-  const state = url.searchParams.get('state');
+
+  // Supabase can strip query params from redirectTo in production,
+  // so we use a cookie as a reliable fallback for the CLI state.
+  const stateFromUrl    = url.searchParams.get('state');
+  const cookieStore     = cookies();
+  const stateFromCookie = cookieStore.get('promptos_cli_state')?.value ?? null;
+  const state           = stateFromUrl || stateFromCookie;
 
   console.log('\n=============================================');
   console.log('>>> AUTH CALLBACK ROUTE HIT');
   console.log('URL:', request.url);
   console.log('Has Code:', !!code);
-  console.log('Has State:', !!state);
+  console.log('State from URL:', stateFromUrl);
+  console.log('State from Cookie:', stateFromCookie);
+  console.log('Effective State:', state);
 
   if (!code) {
     return NextResponse.redirect(new URL('/login?error=no_code', request.url));
   }
 
-  const cookieStore = cookies();
   console.log('Incoming Callback Cookies:', cookieStore.getAll().map(c => c.name));
   
   const redirectUrl = state 
@@ -33,6 +40,11 @@ export async function GET(request: NextRequest) {
     : new URL('/dashboard', request.url);
 
   const response = NextResponse.redirect(redirectUrl);
+
+  // Clear the CLI state cookie now that we've read it
+  if (stateFromCookie) {
+    response.cookies.set('promptos_cli_state', '', { path: '/', maxAge: 0 });
+  }
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -69,12 +81,18 @@ export async function GET(request: NextRequest) {
   // CLI token handoff — store JWT so CLI can pick it up
   if (state) {
     const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://prompt-os-dusky.vercel.app';
-    await fetch(`${apiBase}/auth/cli-token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ state, token: data.session.access_token }),
-    }).catch(() => {}); // Non-blocking — CLI polling will retry
+    try {
+      const handoffRes = await fetch(`${apiBase}/auth/cli-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state, token: data.session.access_token }),
+      });
+      console.log('CLI token handoff status:', handoffRes.status);
+    } catch (err) {
+      console.error('CLI token handoff failed:', err);
+    }
   }
 
   return response;
 }
+
