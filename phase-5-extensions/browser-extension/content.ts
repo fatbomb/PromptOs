@@ -89,14 +89,16 @@ async function getToken(): Promise<string | null> {
   });
 }
 
-// Listen for login success from background worker
+// Listen for login success from background worker — re-run the flow instead of closing
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg.type === 'LOGIN_SUCCESS') {
     const overlay = document.getElementById('promptos-overlay-host');
-    if (overlay) {
-      const shadow = overlay.shadowRoot;
-      if (shadow?.getElementById('promptos-login-btn')) {
-        overlay.remove();
+    if (overlay && overlay.shadowRoot?.getElementById('promptos-login-btn')) {
+      // Store the pending prompt on the host element so we can recover it
+      const pending = (overlay as any)._pendingPrompt as string | undefined;
+      const inputEl = (overlay as any)._inputEl as HTMLElement | null;
+      if (pending) {
+        runQuestionFlow(overlay.shadowRoot!, overlay as HTMLElement, inputEl ?? null, pending);
       }
     }
   }
@@ -108,8 +110,10 @@ chrome.runtime.onMessage.addListener((msg) => {
 // ---------------------------------------------------------------------------
 
 async function apiFetch(path: string, body: object): Promise<Record<string, unknown>> {
+  console.log(`[PromptOS] apiFetch called: ${path}`, body);
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
+      console.error(`[PromptOS] apiFetch timeout: ${path}`);
       reject(new Error('Request timed out after 30s. Is the backend running on localhost:8000?'));
     }, 30000);
 
@@ -120,8 +124,10 @@ async function apiFetch(path: string, body: object): Promise<Record<string, unkn
         clearTimeout(timeout);
         port.disconnect();
         if (res.error) {
+          console.error(`[PromptOS] apiFetch error from background:`, res.error);
           reject(new Error(res.error));
         } else {
+          console.log(`[PromptOS] apiFetch success: ${path}`, res.data);
           resolve(res.data);
         }
       });
@@ -129,6 +135,7 @@ async function apiFetch(path: string, body: object): Promise<Record<string, unkn
       port.onDisconnect.addListener(() => {
         clearTimeout(timeout);
         if (chrome.runtime.lastError) {
+          console.error(`[PromptOS] apiFetch port disconnected:`, chrome.runtime.lastError.message);
           reject(new Error(`Port disconnected: ${chrome.runtime.lastError.message}`));
         }
       });
@@ -136,6 +143,7 @@ async function apiFetch(path: string, body: object): Promise<Record<string, unkn
       port.postMessage({ type: 'API_FETCH', path, body });
     } catch (err) {
       clearTimeout(timeout);
+      console.error(`[PromptOS] apiFetch caught error:`, err);
       reject(err);
     }
   });
@@ -267,10 +275,16 @@ function openOverlay(): void {
     contextProject: '',
   };
 
-  const hostDiv = document.createElement('div');
+  const hostDiv = document.createElement('div') as HTMLElement & {
+    _pendingPrompt?: string;
+    _inputEl?: HTMLElement | null;
+  };
   hostDiv.id = 'promptos-overlay-host';
   hostDiv.style.cssText =
     'position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);';
+  // Stash for LOGIN_SUCCESS handler
+  hostDiv._pendingPrompt = rawPrompt;
+  hostDiv._inputEl = inputEl;
 
   const shadow = hostDiv.attachShadow({ mode: 'open' });
 
@@ -281,9 +295,11 @@ function openOverlay(): void {
   shadow.appendChild(buildCommandCenter(rawPrompt));
   document.body.appendChild(hostDiv);
 
-  // Close on backdrop click
+  // Close on backdrop click — only if the click landed on the host itself (not bubbled from modal)
   hostDiv.addEventListener('click', (e) => {
-    if (e.target === hostDiv) hostDiv.remove();
+    if (e.target === hostDiv && !shadow.getElementById('promptos-wrapper')) {
+      hostDiv.remove();
+    }
   });
 
   wireCommandCenter(shadow, hostDiv, inputEl, rawPrompt);
@@ -339,6 +355,36 @@ function buildCommandCenter(rawPrompt: string): HTMLElement {
   return wrapper;
 }
 
+// Wire a freshly-rendered login screen — call this every time loginHTML() is shown.
+function wireLoginScreen(
+  shadow: ShadowRoot,
+  hostDiv: HTMLElement,
+  inputEl: HTMLElement | HTMLTextAreaElement | null,
+  rawPrompt: string
+): void {
+  const loginBtn = shadow.getElementById('promptos-login-btn');
+  const closeLoginBtn = shadow.getElementById('promptos-close-login-btn');
+
+  if (loginBtn && !(loginBtn as any)._posBound) {
+    (loginBtn as any)._posBound = true;
+    loginBtn.addEventListener('click', () => {
+      setContent(shadow, loadingHTML('Opening login... waiting up to 60s'));
+      chrome.runtime.sendMessage({ type: 'START_LOGIN' }, (res: { ok: boolean }) => {
+        if (res?.ok) {
+          runQuestionFlow(shadow, hostDiv, inputEl, rawPrompt);
+        } else {
+          setContent(shadow, errorHTML('Login timed out. Please try again via the extension popup.'));
+        }
+      });
+    });
+  }
+
+  if (closeLoginBtn && !(closeLoginBtn as any)._posBound) {
+    (closeLoginBtn as any)._posBound = true;
+    closeLoginBtn.addEventListener('click', () => hostDiv.remove());
+  }
+}
+
 function wireCommandCenter(
   shadow: ShadowRoot,
   hostDiv: HTMLElement,
@@ -349,11 +395,11 @@ function wireCommandCenter(
   const startBtn = shadow.getElementById('promptos-start-btn');
   const promptToggle = shadow.getElementById('promptos-prompt-toggle');
 
-  if (!closeBtn || !startBtn) {
-    // DOM not ready yet — retry once
-    setTimeout(() => wireCommandCenter(shadow, hostDiv, inputEl, rawPrompt), 50);
-    return;
-  }
+  if (!closeBtn || !startBtn) return; // elements not ready — no-op (no more retry loop)
+
+  // Guard against duplicate wiring (e.g. from retry calls)
+  if ((startBtn as any)._posBound) return;
+  (startBtn as any)._posBound = true;
 
   closeBtn.addEventListener('click', () => hostDiv.remove());
 
@@ -406,21 +452,26 @@ async function runQuestionFlow(
   console.log('[PromptOS] runQuestionFlow started');
   setContent(shadow, loadingHTML('Checking login...'));
 
-  const token = await getToken();
+  let token = await getToken();
   console.log('[PromptOS] token exists:', !!token);
+
+  if (token) {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      if (payload.exp * 1000 < Date.now()) {
+        console.log('[PromptOS] token is expired');
+        token = null;
+        chrome.storage.local.remove('promptos_jwt');
+      }
+    } catch {
+      token = null;
+      chrome.storage.local.remove('promptos_jwt');
+    }
+  }
   if (!token) {
+    console.log('[PromptOS] no valid token — showing login screen');
     setContent(shadow, loginHTML());
-    shadow.getElementById('promptos-login-btn')?.addEventListener('click', () => {
-      setContent(shadow, loadingHTML('Opening login... waiting up to 60s'));
-      chrome.runtime.sendMessage({ type: 'START_LOGIN' }, (res) => {
-        if (res?.ok) {
-          runQuestionFlow(shadow, hostDiv, inputEl, rawPrompt);
-        } else {
-          setContent(shadow, errorHTML('Login timed out. Please try again via the extension popup.'));
-        }
-      });
-    });
-    shadow.getElementById('promptos-close-login-btn')?.addEventListener('click', () => hostDiv.remove());
+    wireLoginScreen(shadow, hostDiv, inputEl, rawPrompt);
     return;
   }
 
@@ -440,19 +491,12 @@ async function runQuestionFlow(
     console.log('[PromptOS] session started:', sessionId);
   } catch (err) {
     const errMsg = String(err);
+    console.error('[PromptOS] /session/start error:', errMsg);
     if (errMsg.includes('401') || errMsg.includes('403')) {
+      // Token was accepted locally but rejected by backend — clear it and ask to re-login
+      chrome.storage.local.remove('promptos_jwt');
       setContent(shadow, loginHTML());
-      shadow.getElementById('promptos-login-btn')?.addEventListener('click', () => {
-        setContent(shadow, loadingHTML('Opening login... waiting up to 60s'));
-        chrome.runtime.sendMessage({ type: 'START_LOGIN' }, (res: {ok: boolean}) => {
-          if (res?.ok) {
-            runQuestionFlow(shadow, hostDiv, inputEl, rawPrompt);
-          } else {
-            setContent(shadow, errorHTML('Login timed out. Please try again via the extension popup.'));
-          }
-        });
-      });
-      shadow.getElementById('promptos-close-login-btn')?.addEventListener('click', () => hostDiv.remove());
+      wireLoginScreen(shadow, hostDiv, inputEl, rawPrompt);
     } else {
       setContent(shadow, errorHTML(`Failed to start session: ${errMsg}`));
     }
@@ -470,6 +514,7 @@ async function askNextQuestion(
   userMessage: string,
   turnNum: number
 ): Promise<void> {
+  console.log(`[PromptOS] askNextQuestion started. Session: ${sessionId}, Turn: ${turnNum}, Message: ${userMessage}`);
   setContent(shadow, loadingHTML('Thinking...'));
 
   let msgRes: Record<string, unknown>;
@@ -478,7 +523,9 @@ async function askNextQuestion(
       session_id: sessionId,
       user_message: userMessage,
     });
+    console.log('[PromptOS] askNextQuestion msgRes received:', msgRes);
   } catch (err) {
+    console.error('[PromptOS] askNextQuestion API error:', err);
     setContent(shadow, errorHTML(`API error: ${err}`));
     return;
   }

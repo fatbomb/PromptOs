@@ -12,12 +12,22 @@ extIdEl.addEventListener('click', () => {
   setTimeout(() => { extIdEl.textContent = chrome.runtime.id; }, 1500);
 });
 
-// Check if already logged in
 chrome.storage.local.get('promptos_jwt', (result) => {
   if (result && result.promptos_jwt) {
-    btn.textContent = '✓ Logged in — Open Dashboard →';
-    btn.href = 'http://localhost:3000/dashboard';
-    status.style.display = 'block';
+    const token = result.promptos_jwt;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      if (payload.exp * 1000 > Date.now()) {
+        btn.textContent = '✓ Logged in — Open Dashboard →';
+        btn.href = 'http://localhost:3000/dashboard';
+        status.style.display = 'block';
+        return;
+      } else {
+        chrome.storage.local.remove('promptos_jwt');
+      }
+    } catch (e) {
+      chrome.storage.local.remove('promptos_jwt');
+    }
   }
 });
 

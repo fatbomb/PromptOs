@@ -49,9 +49,11 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 // ---------------------------------------------------------------------------
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== 'api-fetch') return;
+  console.log('[PromptOS-Background] port connected for api-fetch');
 
   port.onMessage.addListener(async (msg) => {
     if (msg.type !== 'API_FETCH') return;
+    console.log(`[PromptOS-Background] handling API_FETCH for: ${msg.path}`);
     try {
       const result = await chrome.storage.local.get('promptos_jwt');
       const token = result.promptos_jwt ?? null;
@@ -66,13 +68,16 @@ chrome.runtime.onConnect.addListener((port) => {
 
       if (!res.ok) {
         const text = await res.text();
+        console.error(`[PromptOS-Background] fetch error: ${res.status}`, text);
         port.postMessage({ error: `API error ${res.status}: ${text}` });
         return;
       }
 
       const data = await res.json();
+      console.log(`[PromptOS-Background] fetch success for: ${msg.path}`, data);
       port.postMessage({ data });
     } catch (err) {
+      console.error(`[PromptOS-Background] fetch caught error:`, err);
       port.postMessage({ error: String(err) });
     }
   });
