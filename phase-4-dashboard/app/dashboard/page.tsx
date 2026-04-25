@@ -78,7 +78,7 @@ export default async function DashboardPage() {
       <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] rounded-full bg-blue-600/10 blur-[120px] pointer-events-none"></div>
       <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full bg-purple-600/10 blur-[150px] pointer-events-none"></div>
 
-      <div className="relative z-10 max-w-7xl mx-auto animate-fade-in-up">
+      <div className="relative z-10 max-w-7xl mx-auto">
         <header className="mb-12">
           <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-3">
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400">

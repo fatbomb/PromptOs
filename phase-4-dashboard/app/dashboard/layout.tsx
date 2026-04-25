@@ -31,7 +31,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen flex flex-col font-sans transition-colors duration-300">
       {/* Top Navigation */}
-      <nav className="sticky top-0 z-50 bg-[var(--nav-bg)] backdrop-blur-lg border-b border-[var(--glass-border)]">
+      <nav className="sticky top-0 z-50 bg-white/50 dark:bg-[#0f172a]/50 backdrop-blur-lg border-b border-black/5 dark:border-white/5 relative">
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-8">

@@ -45,7 +45,7 @@ export default function KnowledgeMap({ data, onConceptClick }: Props) {
     if (active && payload && payload.length) {
       const p = payload[0].payload;
       return (
-        <div className="bg-gray-900/90 backdrop-blur-md border border-white/10 p-4 rounded-xl shadow-2xl">
+        <div className="bg-gray-900/90 backdrop-blur-md border border-white/10 p-4 rounded-xl shadow-sm dark:shadow-none">
           <p className="text-lg font-bold text-white mb-1">{p.concept}</p>
           <p className="text-sm text-gray-400">Score: <span className="text-white font-semibold">{p.avg_score.toFixed(1)}</span></p>
           <p className="text-sm text-gray-400">Encounters: <span className="text-white font-semibold">{p.encounter_count}</span></p>

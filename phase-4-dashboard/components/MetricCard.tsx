@@ -18,7 +18,7 @@ export default function MetricCard({ label, value, unit, variant = 'blue', icon 
   const selectedGradient = gradients[variant];
 
   return (
-    <div className={`relative overflow-hidden glass-card rounded-2xl p-6 group hover:-translate-y-1 hover:shadow-2xl border ${selectedGradient}`}>
+    <div className={`relative overflow-hidden glass-card rounded-2xl p-6 group hover:-translate-y-1 hover:shadow-md dark:hover:shadow-none border ${selectedGradient}`}>
       {/* Accent Top Border */}
       <div className={`absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r ${selectedGradient.split(' ')[0]} ${selectedGradient.split(' ')[1]} opacity-50`}></div>
       

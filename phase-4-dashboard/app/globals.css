@@ -38,12 +38,12 @@ input::-webkit-credentials-auto-fill-button {
   .glass-panel {
     background-color: var(--glass-bg);
     border-color: var(--glass-border);
-    @apply backdrop-blur-xl shadow-2xl;
+    @apply backdrop-blur-xl shadow-sm dark:shadow-none;
   }
   .glass-card {
     background-color: var(--glass-card-bg);
     border-color: var(--glass-card-border);
-    @apply backdrop-blur-lg shadow-lg transition-all duration-300;
+    @apply backdrop-blur-lg shadow-sm dark:shadow-none transition-all duration-300;
   }
   
   .text-glow {
