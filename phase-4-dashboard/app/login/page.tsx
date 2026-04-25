@@ -19,6 +19,9 @@ function LoginForm() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
+  // Trim trailing slash so env vars like 'https://api.example.com/' don't create //endpoint
+  const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || 'https://prompt-os-dusky.vercel.app').replace(/\/$/, '');
+
   const supabase = useMemo(() => createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -34,8 +37,7 @@ function LoginForm() {
       if (session) {
         if (state) {
           // Hand off token to CLI
-          const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://prompt-os-dusky.vercel.app';
-          await fetch(`${apiBase}/auth/cli-token`, {
+          await fetch(`${API_BASE}/auth/cli-token`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ state, token: session.access_token }),
@@ -100,8 +102,7 @@ function LoginForm() {
         } else {
           // CLI token handoff for email login
           if (state && data.session) {
-            const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://prompt-os-dusky.vercel.app';
-            await fetch(`${apiBase}/auth/cli-token`, {
+            await fetch(`${API_BASE}/auth/cli-token`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ state, token: data.session.access_token }),
@@ -299,7 +300,7 @@ export default function LoginPage() {
   useEffect(() => {
     const checkHealth = async () => {
       try {
-        const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://prompt-os-dusky.vercel.app';
+        const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || 'https://prompt-os-dusky.vercel.app').replace(/\/$/, '');
         const resp = await fetch(`${apiBase}/health`, { cache: 'no-store' });
         setIsOnline(resp.ok);
       } catch (err) {
