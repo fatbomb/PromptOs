@@ -33,13 +33,8 @@ app = FastAPI(title="PromptOS API", version="1.0.0")
 # ---------------------------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "https://prompt-os-dusky.vercel.app",
-        # Add your dashboard Vercel URL here if different
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,  # Must be False when allow_origins=["*"]
     allow_methods=["*"],
     allow_headers=["*"],
 )
