@@ -17,7 +17,7 @@ export async function runCommand(toolName, rawPrompt, options) {
 
   const child = spawn(toolName, [assembledPrompt], {
     stdio: 'inherit',
-    shell: true,
+    shell: false,
   });
 
   child.on('error', (err) => {

@@ -21,11 +21,14 @@ import readline from 'readline';
 import chalk from 'chalk';
 import gradient from 'gradient-string';
 import figures from 'figures';
+import inquirer from 'inquirer';
+import { spawn } from 'child_process';
 import { printBanner, printPanel, printSuccess, printError, printInfo, printDim, colors } from '../utils/ui.js';
 import { askCommand } from './ask.js';
 import { loginCommand } from './login.js';
 import { logoutCommand } from './logout.js';
 import { statsCommand } from './stats.js';
+import { ensureAuth } from '../utils/ensure-auth.js';
 
 // ─────────────────────────────────────────────
 // Shell state
@@ -89,6 +92,10 @@ function printStatusBar() {
 // ─────────────────────────────────────────────
 export async function shellCommand() {
   printBanner('Interactive Shell — Ctrl+C to exit');
+  
+  // Check auth status on startup
+  await ensureAuth();
+
   printShellHelp();
   printStatusBar();
 
@@ -193,10 +200,61 @@ export async function shellCommand() {
 
     // ── Prompt refinement ──────────────────────────────────────────
     console.log('');
-    await askCommand(input, {
+    const assembledPrompt = await askCommand(input, {
       skip: shellState.mode === 'skip',
       mid:  shellState.mode === 'mid',
     }, shellState.tool);
+
+    if (assembledPrompt) {
+      console.log('');
+      const { runTool } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'runTool',
+          message: shellState.tool
+            ? chalk.hex(colors.secondary)(`Send to ${shellState.tool} now?`)
+            : chalk.hex(colors.secondary)(`Send to a CLI model now?`),
+          default: false,
+        },
+      ]);
+
+      if (runTool) {
+        let target = shellState.tool;
+        if (!target) {
+          const { selectedTool } = await inquirer.prompt([
+            {
+              type: 'list',
+              name: 'selectedTool',
+              message: chalk.hex(colors.secondary)('Which tool?'),
+              choices: ['claude', 'gemini', 'chatgpt', 'copilot', 'none'],
+            },
+          ]);
+          if (selectedTool !== 'none') target = selectedTool;
+        }
+
+        if (target) {
+          await new Promise((resolve) => {
+            console.log(chalk.bold.cyan(`\n🚀 Sending assembled prompt to ${target}...\n`));
+            const child = spawn(target, [assembledPrompt], {
+              stdio: 'inherit',
+              shell: false,
+            });
+
+            child.on('error', (err) => {
+              console.error(chalk.red(`Failed to start ${target}:`), err.message);
+              console.log(chalk.dim(`Is \`${target}\` installed? Please make sure it is installed and available in your PATH.`));
+            });
+
+            child.on('close', (code) => {
+              if (code !== 0) {
+                console.log(chalk.yellow(`\n${target} exited with code ${code}`));
+              }
+              resolve();
+            });
+          });
+        }
+      }
+    }
 
     console.log('');
     printStatusBar();
