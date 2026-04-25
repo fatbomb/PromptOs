@@ -51,7 +51,14 @@ for _var in _REQUIRED_VARS:
         logger.warning("[ENV] %-22s = (MISSING — add to Vercel Dashboard)", _var)
 # ────────────────────────────────────────────────────────────────────────────
 
-from routers import session, refusal, tokens, auth, quiz
+# ── Router imports (wrapped so failures are visible in Vercel logs) ─────────
+try:
+    from routers import session, refusal, tokens, auth, quiz
+    logger.info("[ROUTER] All routers imported successfully")
+except Exception as _router_err:
+    logger.error("[ROUTER] IMPORT FAILED: %s", _router_err, exc_info=True)
+    raise  # re-raise so Vercel reports a 500 instead of silently 404ing
+# ────────────────────────────────────────────────────────────────────────────
 
 app = FastAPI(title="PromptOS API", version="1.0.0")
 

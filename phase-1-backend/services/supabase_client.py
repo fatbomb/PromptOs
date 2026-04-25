@@ -1,11 +1,34 @@
 import os
+import logging
 from supabase import create_client, Client
 from datetime import datetime, timedelta
 
-_url = os.environ.get("SUPABASE_URL", "")
-_key = os.environ.get("SUPABASE_ANON_KEY", "") # Usually use Service Role for backend, but Anon works if RLS is off or configured
+logger = logging.getLogger("promptos")
 
-supabase: Client = create_client(_url, _key)
+_url = os.environ.get("SUPABASE_URL", "")
+_key = os.environ.get("SUPABASE_ANON_KEY", "")
+
+# Lazy-initialize so a missing URL doesn't crash at import time on Vercel.
+# All routes would silently 404 if create_client() raised here.
+_supabase_client: Client | None = None
+
+def _get_client() -> Client:
+    global _supabase_client
+    if _supabase_client is None:
+        url = os.environ.get("SUPABASE_URL", "")
+        key = os.environ.get("SUPABASE_ANON_KEY", "")
+        if not url or not key:
+            raise RuntimeError(
+                "SUPABASE_URL and SUPABASE_ANON_KEY must be set. "
+                "Add them in Vercel Dashboard → Settings → Environment Variables."
+            )
+        logger.info("[SUPABASE] Creating client for %s", url[:30])
+        _supabase_client = create_client(url, key)
+    return _supabase_client
+
+# Convenience alias — use supabase() instead of supabase
+supabase = _get_client
+
 
 def store_session_db(session_data: dict):
     """Phase 1.4 — Persists the session to the `sessions` table."""
@@ -28,7 +51,7 @@ def store_session_db(session_data: dict):
             "was_refused": session_data.get("was_refused", False),
             "source": session_data.get("source", "cli"),
         }
-        res = supabase.table("sessions").insert(row).execute()
+        res = supabase().table("sessions").insert(row).execute()
         return res.data[0] if res.data else None
     except Exception as e:
         print(f"[supabase_client] Error storing session: {e}")
@@ -38,7 +61,7 @@ def upsert_concept_db(user_id: str, concept: str, score: int, band: str):
     """Phase 3.2 — Upserts a concept into the `concept_map` table."""
     try:
         # Check if exists
-        res = supabase.table("concept_map").select("*").eq("user_id", user_id).eq("concept", concept).execute()
+        res = supabase().table("concept_map").select("*").eq("user_id", user_id).eq("concept", concept).execute()
         
         if res.data:
             existing = res.data[0]
@@ -46,14 +69,14 @@ def upsert_concept_db(user_id: str, concept: str, score: int, band: str):
             # Simple rolling average
             new_score = (existing["avg_score"] * existing["encounter_count"] + score) / new_count
             
-            supabase.table("concept_map").update({
+            supabase().table("concept_map").update({
                 "encounter_count": new_count,
                 "avg_score": new_score,
                 "color_band": band,
                 "last_seen_at": datetime.now().isoformat()
             }).eq("id", existing["id"]).execute()
         else:
-            supabase.table("concept_map").insert({
+            supabase().table("concept_map").insert({
                 "user_id": user_id,
                 "concept": concept,
                 "encounter_count": 1,
@@ -72,17 +95,17 @@ def update_weekly_aggregates(user_id: str, scores: dict):
         monday = (now - timedelta(days=now.weekday())).date().isoformat()
         
         # 1. Update skill_decay
-        res = supabase.table("skill_decay").select("*").eq("user_id", user_id).eq("week_start", monday).execute()
+        res = supabase().table("skill_decay").select("*").eq("user_id", user_id).eq("week_start", monday).execute()
         if res.data:
             existing = res.data[0]
             count = existing["total_sessions"] + 1
-            supabase.table("skill_decay").update({
+            supabase().table("skill_decay").update({
                 "total_sessions": count,
                 "avg_dependency_score": (existing["avg_dependency_score"] * existing["total_sessions"] + scores.get("dependency_score", 50)) / count,
                 "avg_thinking_depth": (existing["avg_thinking_depth"] * existing["total_sessions"] + scores.get("thinking_depth", 0)) / count,
             }).eq("id", existing["id"]).execute()
         else:
-            supabase.table("skill_decay").insert({
+            supabase().table("skill_decay").insert({
                 "user_id": user_id,
                 "week_start": monday,
                 "total_sessions": 1,
@@ -91,20 +114,20 @@ def update_weekly_aggregates(user_id: str, scores: dict):
             }).execute()
             
         # 2. Update token_savings
-        res = supabase.table("token_savings").select("*").eq("user_id", user_id).eq("week_start", monday).execute()
+        res = supabase().table("token_savings").select("*").eq("user_id", user_id).eq("week_start", monday).execute()
         turns_saved = scores.get("estimated_turns_saved", 0)
         time_saved = turns_saved * 0.67
         cost_saved = turns_saved * 0.02 # Placeholder cost
         
         if res.data:
             existing = res.data[0]
-            supabase.table("token_savings").update({
+            supabase().table("token_savings").update({
                 "estimated_turns_saved": existing["estimated_turns_saved"] + turns_saved,
                 "estimated_wait_time_saved_min": existing["estimated_wait_time_saved_min"] + time_saved,
                 "estimated_cost_saved_usd": existing["estimated_cost_saved_usd"] + cost_saved,
             }).eq("id", existing["id"]).execute()
         else:
-            supabase.table("token_savings").insert({
+            supabase().table("token_savings").insert({
                 "user_id": user_id,
                 "week_start": monday,
                 "estimated_turns_saved": turns_saved,
@@ -120,7 +143,7 @@ def update_daily_quality(user_id: str, scores: dict):
     """Phase 4.3 — Updates the daily_quality aggregation table."""
     try:
         today = datetime.now().date().isoformat()
-        res = supabase.table("daily_quality").select("*").eq("user_id", user_id).eq("day", today).execute()
+        res = supabase().table("daily_quality").select("*").eq("user_id", user_id).eq("day", today).execute()
         
         raw_score = scores.get("raw_specificity_score", 0)
         assembled_score = scores.get("assembled_specificity_score", 0)
@@ -129,14 +152,14 @@ def update_daily_quality(user_id: str, scores: dict):
         if res.data:
             existing = res.data[0]
             count = existing["session_count"] + 1
-            supabase.table("daily_quality").update({
+            supabase().table("daily_quality").update({
                 "session_count": count,
                 "avg_raw_score": (existing["avg_raw_score"] * existing["session_count"] + raw_score) / count,
                 "avg_assembled": (existing["avg_assembled"] * existing["session_count"] + assembled_score) / count,
                 "avg_delta": (existing["avg_delta"] * existing["session_count"] + delta) / count,
             }).eq("id", existing["id"]).execute()
         else:
-            supabase.table("daily_quality").insert({
+            supabase().table("daily_quality").insert({
                 "user_id": user_id,
                 "day": today,
                 "session_count": 1,
