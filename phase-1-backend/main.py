@@ -17,6 +17,11 @@ _root = Path(__file__).parent.resolve()
 if str(_root) not in sys.path:
     sys.path.insert(0, str(_root))
 
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("promptos")
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -25,7 +30,26 @@ from dotenv import load_dotenv
 # Production (Vercel): env vars are set in the Vercel Dashboard → Settings → Environment Variables.
 # override=False ensures Vercel's real env vars always win over a local .env file.
 env_path = _root / ".env"
+_env_file_found = env_path.exists()
 load_dotenv(dotenv_path=env_path, override=False)
+
+# ── Startup env diagnostics (values redacted for security) ──────────────────
+logger.info("[ENV] .env file found locally: %s", _env_file_found)
+_REQUIRED_VARS = [
+    "SUPABASE_URL",
+    "SUPABASE_ANON_KEY",
+    "SUPABASE_JWT_SECRET",
+    "GEMINI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GROQ_API_KEY",
+]
+for _var in _REQUIRED_VARS:
+    _val = os.environ.get(_var)
+    if _val:
+        logger.info("[ENV] %-22s = %s***  (set)", _var, _val[:6])
+    else:
+        logger.warning("[ENV] %-22s = (MISSING — add to Vercel Dashboard)", _var)
+# ────────────────────────────────────────────────────────────────────────────
 
 from routers import session, refusal, tokens, auth, quiz
 
