@@ -119,7 +119,7 @@ export default async function TeamPage({ searchParams }: { searchParams: { teamI
 
         {teamInfo ? (
           <div className="space-y-8">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white dark:bg-[#0f172a] shadow-[0_2px_10px_-4px_rgba(0,0,0,0.1)] dark:shadow-none p-6 rounded-3xl border border-black/5 dark:border-white/5 transition-all">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 glass-card p-6 rounded-3xl border border-[var(--glass-border)] transition-all">
                <div>
                  <div className="flex items-center gap-3">
                     <h2 className="text-2xl font-bold text-[var(--text-primary)]">{teamInfo.name}</h2>
@@ -137,7 +137,7 @@ export default async function TeamPage({ searchParams }: { searchParams: { teamI
                </div>
             </div>
 
-            <div className="bg-white dark:bg-[#0f172a] rounded-3xl border border-black/5 dark:border-white/5 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)] dark:shadow-none overflow-hidden">
+            <div className="glass-card rounded-3xl border border-[var(--glass-border)] overflow-hidden">
               <div className="grid grid-cols-12 gap-4 p-5 border-b border-black/5 dark:border-white/5 bg-gray-50 dark:bg-white/5 text-[10px] font-extrabold text-[var(--text-secondary)] uppercase tracking-widest">
                 <div className="col-span-2 text-center">Rank</div>
                 <div className="col-span-6">Developer</div>
@@ -184,7 +184,7 @@ export default async function TeamPage({ searchParams }: { searchParams: { teamI
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white dark:bg-[#0f172a] p-6 rounded-3xl border border-black/5 dark:border-white/5 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] dark:shadow-none bg-gradient-to-br from-gray-50/50 to-transparent dark:from-white/5 dark:to-transparent">
+                <div className="glass-card p-6 rounded-3xl border border-[var(--glass-border)] bg-gradient-to-br from-white/5 to-transparent">
                     <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-4">Most Improved</p>
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-500/20 border border-emerald-200 dark:border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold">?</div>
@@ -194,7 +194,7 @@ export default async function TeamPage({ searchParams }: { searchParams: { teamI
                         </div>
                     </div>
                 </div>
-                <div className="bg-white dark:bg-[#0f172a] p-6 rounded-3xl border border-black/5 dark:border-white/5 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] dark:shadow-none bg-gradient-to-br from-gray-50/50 to-transparent dark:from-white/5 dark:to-transparent">
+                <div className="glass-card p-6 rounded-3xl border border-[var(--glass-border)] bg-gradient-to-br from-white/5 to-transparent">
                     <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-4">Team Average</p>
                     <div className="flex items-baseline gap-2">
                         <span className="text-3xl font-black text-cyan-600 dark:text-cyan-400">
@@ -205,7 +205,7 @@ export default async function TeamPage({ searchParams }: { searchParams: { teamI
                         <span className="text-xs text-gray-500 font-bold">Dependency</span>
                     </div>
                 </div>
-                <div className="bg-white dark:bg-[#0f172a] p-6 rounded-3xl border border-black/5 dark:border-white/5 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] dark:shadow-none bg-gradient-to-br from-gray-50/50 to-transparent dark:from-white/5 dark:to-transparent">
+                <div className="glass-card p-6 rounded-3xl border border-[var(--glass-border)] bg-gradient-to-br from-white/5 to-transparent">
                     <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-4">Refusal Rate</p>
                     <div className="flex items-baseline gap-2">
                         <span className="text-3xl font-black text-purple-600 dark:text-purple-400">12%</span>
@@ -215,7 +215,7 @@ export default async function TeamPage({ searchParams }: { searchParams: { teamI
             </div>
           </div>
         ) : (
-          <div className="text-center p-12 bg-white dark:bg-[#0f172a] rounded-3xl border border-black/5 dark:border-white/5 shadow-sm max-w-2xl mx-auto">
+          <div className="text-center p-12 glass-card rounded-3xl border border-[var(--glass-border)] max-w-2xl mx-auto">
             <div className="w-20 h-20 bg-cyan-100 dark:bg-cyan-900/20 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-cyan-200 dark:border-cyan-500/20 shadow-sm dark:shadow-[0_0_30px_rgba(6,182,212,0.1)]">
                <svg className="w-10 h-10 text-cyan-600 dark:text-cyan-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
             </div>

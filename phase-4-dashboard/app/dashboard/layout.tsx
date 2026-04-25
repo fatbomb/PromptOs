@@ -28,10 +28,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: 'Quiz', href: '/dashboard/quiz' },
   ];
 
+  const getPyramidGradient = () => {
+    if (pathname === '/dashboard/knowledge') return 'from-emerald-500 via-teal-500 to-cyan-500';
+    if (pathname === '/dashboard/decay') return 'from-amber-500 via-orange-500 to-red-500';
+    if (pathname === '/dashboard/team') return 'from-cyan-500 via-blue-500 to-indigo-500';
+    return 'from-blue-500 via-indigo-500 to-purple-500';
+  };
+
   return (
-    <div className="min-h-screen flex flex-col font-sans transition-colors duration-300">
+    <div className="min-h-screen flex flex-col font-sans transition-colors duration-300 bg-[var(--bg-color)] text-[var(--text-primary)]">
       {/* Top Navigation */}
-      <nav className="sticky top-0 z-50 bg-white/50 dark:bg-[#0f172a]/50 backdrop-blur-lg border-b border-black/5 dark:border-white/5 relative">
+      <nav className="sticky top-0 z-50 bg-white/30 dark:bg-[#0f172a]/30 backdrop-blur-2xl">
         <div className="max-w-7xl mx-auto px-6 lg:px-12">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-8">
@@ -83,8 +90,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </nav>
 
+      {/* Floating Gradient Pyramid */}
+      <div className="fixed bottom-[-15%] right-[-8%] w-[600px] h-[600px] pointer-events-none z-0 animate-float-pyramid filter blur-[70px] opacity-25 mix-blend-multiply dark:mix-blend-screen">
+        <div 
+          className={`w-full h-full bg-gradient-to-tr ${getPyramidGradient()} transition-all duration-1000`}
+          style={{ clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)' }}
+        ></div>
+      </div>
+
       {/* Main Content Area */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto relative z-10">
         {children}
       </div>
     </div>

@@ -27,11 +27,7 @@ export default async function QuizPage() {
     .order('encounter_count', { ascending: false });
 
   return (
-    <main className="relative min-h-screen p-6 md:p-12 overflow-hidden bg-[var(--bg-color)]">
-      {/* Background Decorative Elements */}
-      <div className="absolute top-[-10%] left-[-5%] w-[400px] h-[400px] rounded-full bg-blue-600/10 blur-[120px] pointer-events-none"></div>
-      <div className="absolute bottom-[-10%] right-[-5%] w-[500px] h-[500px] rounded-full bg-purple-600/10 blur-[150px] pointer-events-none"></div>
-      
+    <main className="relative min-h-screen p-6 md:p-12 overflow-hidden">
       <div className="max-w-7xl mx-auto relative z-10">
         <header className="mb-12">
           <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-3">

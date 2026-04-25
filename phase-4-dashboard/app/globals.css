@@ -16,22 +16,22 @@ input::-webkit-credentials-auto-fill-button {
   --bg-color: #030712;
   --text-primary: #ffffff;
   --text-secondary: #9ca3af;
-  --glass-bg: rgba(17, 24, 39, 0.4);
+  --glass-bg: rgba(17, 24, 39, 0.2);
   --glass-border: rgba(255, 255, 255, 0.05);
-  --glass-card-bg: rgba(17, 24, 39, 0.6);
+  --glass-card-bg: rgba(17, 24, 39, 0.3);
   --glass-card-border: rgba(255, 255, 255, 0.1);
-  --nav-bg: rgba(17, 24, 39, 0.8);
+  --nav-bg: rgba(17, 24, 39, 0.5);
 }
 
 .light {
   --bg-color: #f8fafc;
   --text-primary: #0f172a;
   --text-secondary: #475569;
-  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-bg: rgba(255, 255, 255, 0.3);
   --glass-border: rgba(0, 0, 0, 0.05);
-  --glass-card-bg: rgba(255, 255, 255, 0.8);
-  --glass-card-border: rgba(0, 0, 0, 0.1);
-  --nav-bg: rgba(255, 255, 255, 0.85);
+  --glass-card-bg: rgba(255, 255, 255, 0.4);
+  --glass-card-border: rgba(0, 0, 0, 0.08);
+  --nav-bg: rgba(255, 255, 255, 0.4);
 }
 
 @layer utilities {

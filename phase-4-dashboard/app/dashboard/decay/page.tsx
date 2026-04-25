@@ -28,9 +28,6 @@ export default async function DecayPage() {
 
   return (
     <main className="relative min-h-screen p-6 md:p-12 overflow-hidden">
-      {/* Background Orbs */}
-      <div className="absolute top-[-10%] right-[-5%] w-[400px] h-[400px] rounded-full bg-amber-600/10 blur-[120px] pointer-events-none"></div>
-      
       <div className="max-w-7xl mx-auto relative z-10">
         <header className="mb-12">
           <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-3">

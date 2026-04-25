@@ -70,14 +70,10 @@ export default async function DashboardPage() {
   const totalSessions = sessions?.length ?? 0;
 
   return (
-    <main className="relative min-h-screen bg-[var(--bg-color)] text-[var(--text-primary)] p-6 md:p-12 overflow-hidden font-sans transition-colors duration-300">
+    <main className="relative min-h-screen p-6 md:p-12 overflow-hidden font-sans transition-colors duration-300">
       <CLILoginToast />
       <ExtensionSync />
       
-      {/* Dynamic Background Glows */}
-      <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] rounded-full bg-blue-600/10 blur-[120px] pointer-events-none"></div>
-      <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full bg-purple-600/10 blur-[150px] pointer-events-none"></div>
-
       <div className="relative z-10 max-w-7xl mx-auto">
         <header className="mb-12">
           <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-3">
