@@ -21,8 +21,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
+# Local dev: load from .env file.
+# Production (Vercel): env vars are set in the Vercel Dashboard → Settings → Environment Variables.
+# override=False ensures Vercel's real env vars always win over a local .env file.
 env_path = _root / ".env"
-load_dotenv(dotenv_path=env_path)
+load_dotenv(dotenv_path=env_path, override=False)
 
 from routers import session, refusal, tokens, auth, quiz
 
