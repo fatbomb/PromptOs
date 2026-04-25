@@ -2,13 +2,10 @@
 
 import { useTheme } from '@/components/ThemeProvider';
 import { createBrowserClient } from '@supabase/ssr';
-<<<<<<< Updated upstream
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import GlowScrollbar from '@/components/GlowScrollbar';
-=======
 import { useEffect, useRef, useState } from 'react';
->>>>>>> Stashed changes
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
