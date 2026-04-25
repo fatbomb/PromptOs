@@ -14,7 +14,7 @@ export async function generateMetadata(
   const session_id = params.session_id;
   
   // Base URL for absolute OG image paths
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://prompt-os-dashboard.vercel.app';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL!;
   const imageUrl = `${baseUrl}/api/share/${session_id}`;
 
   return {

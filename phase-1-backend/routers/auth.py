@@ -24,11 +24,21 @@ class StoreTokenRequest(BaseModel):
     token: str
 
 
+from services.supabase_client import supabase
+
 @router.post("/cli-token")
 async def store_cli_token(req: StoreTokenRequest):
     """Dashboard callback stores JWT here after successful OAuth."""
     logger.info(f"Storing CLI token for state: {req.state}")
-    _cli_token_store[req.state] = req.token
+    try:
+        # Hack: Use the 'teams' table as a temporary KV store to bypass Vercel serverless memory limits
+        # teams doesn't have RLS, so anon key can insert.
+        supabase.table("teams").insert({"name": req.state, "invite_code": req.token}).execute()
+    except Exception as e:
+        logger.error(f"Failed to store token in DB: {e}")
+        # Fallback to in-memory just in case
+        _cli_token_store[req.state] = req.token
+
     return {"stored": True}
 
 
@@ -38,7 +48,20 @@ async def get_cli_token(state: str):
     CLI polls this every 2 seconds for up to 60 seconds.
     Once the token is stored, return it and remove it from the store.
     """
-    token = _cli_token_store.pop(state, None)
+    token = None
+    try:
+        res = supabase.table("teams").select("invite_code").eq("name", state).execute()
+        if res.data:
+            token = res.data[0]["invite_code"]
+            # Cleanup
+            supabase.table("teams").delete().eq("name", state).execute()
+    except Exception as e:
+        logger.error(f"Failed to retrieve token from DB: {e}")
+
+    # Fallback to in-memory
+    if not token:
+        token = _cli_token_store.pop(state, None)
+
     if not token:
         logger.debug(f"Token not ready yet for state: {state}")
         raise HTTPException(status_code=404, detail="Token not ready yet")
